@@ -14,13 +14,13 @@
     "preset": "ts-jest",
     "testEnvironment": "jsdom",
     "setupFilesAfterEnv": [
-      "@testing-library/jest-dom"
+      "<rootDir>/jest.setup.ts"
     ],
     "moduleNameMapper": {
       "^@/(.*)$": "<rootDir>/src/$1"
     },
     "transform": {
-      "^.+\\.(ts|tsx)$": ["ts-jest", {
+      "^.+\\.tsx?$": ["ts-jest", {
         "tsconfig": {
           "jsx": "react-jsx"
         }
