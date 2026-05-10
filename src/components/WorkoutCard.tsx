@@ -1,13 +1,11 @@
-import Link from 'next/link'
 import type { SuggestedWorkout } from '@/lib/types'
 
 interface Props {
   workout: SuggestedWorkout | null
   loading: boolean
-  workoutId: string | null
 }
 
-export function WorkoutCard({ workout, loading, workoutId }: Props) {
+export function WorkoutCard({ workout, loading }: Props) {
   if (loading) {
     return (
       <div className="relative w-full rounded-2xl overflow-hidden border border-white/10 bg-surface-container h-[280px] animate-pulse">

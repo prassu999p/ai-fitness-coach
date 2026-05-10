@@ -76,39 +76,40 @@ export default function WorkoutSessionPage() {
   }
 
   const currentExercise = workout.exercises[currentIndex]
-  const isLastExercise = currentIndex === workout.exercises.length - 1
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
       {/* Fixed Header */}
-      <header className="fixed top-0 w-full max-w-md z-50 bg-surface/60 backdrop-blur-xl border-b border-white/5 flex justify-between items-center px-margin h-16">
-        <button onClick={() => router.back()} className="text-primary hover:opacity-80 transition-opacity p-2 -ml-2">
-          <span className="material-symbols-outlined">arrow_back</span>
-        </button>
-        <h1 className="font-headline-md text-headline-md text-primary uppercase tracking-wider truncate px-xs">
-          {workout.title}
-        </h1>
-        <button
-          onClick={() => setChatOpen(true)}
-          className="text-on-surface-variant hover:text-primary transition-colors p-2 bg-surface-container rounded-full border border-white/5"
-        >
-          <span className="material-symbols-outlined">support_agent</span>
-        </button>
+      <header className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-md z-50 bg-surface/80 backdrop-blur-xl border-b border-white/[0.06]">
+        <div className="flex justify-between items-center px-margin h-14">
+          <button onClick={() => router.back()} className="text-on-surface-variant hover:text-primary-container transition-colors p-1 -ml-1">
+            <span className="material-symbols-outlined text-[22px]">arrow_back</span>
+          </button>
+          <h1 className="font-headline-md text-[18px] text-primary-container uppercase tracking-wider truncate px-xs font-bold">
+            {workout.title}
+          </h1>
+          <button
+            onClick={() => setChatOpen(true)}
+            className="text-on-surface-variant hover:text-primary-container transition-colors p-1.5 bg-surface-container-high rounded-full border border-white/[0.08]"
+          >
+            <span className="material-symbols-outlined text-[20px]">support_agent</span>
+          </button>
+        </div>
       </header>
 
-      <main className="flex-grow pt-[88px] pb-[120px] px-margin flex flex-col gap-md">
+      <main className="flex-grow pt-[72px] pb-[120px] px-margin flex flex-col gap-md">
         {/* Session Active Indicator */}
-        <div className="flex items-center gap-xs bg-surface-container-high px-sm py-xs rounded-full border border-white/10 self-start">
+        <div className="flex items-center gap-xs bg-surface-container px-sm py-xs rounded-full border border-white/[0.08] self-start">
           <div className="w-2 h-2 rounded-full bg-primary-container animate-pulse" />
-          <span className="font-data-sm text-data-sm text-on-surface-variant uppercase tracking-wider">Session Active</span>
+          <span className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Session Active</span>
         </div>
 
         {/* Exercise counter */}
         <div>
-          <p className="font-label-caps text-label-caps text-primary-container tracking-widest mb-xs">
+          <p className="font-label-caps text-label-caps text-primary-container/70 tracking-widest mb-[4px]">
             EXERCISE {currentIndex + 1} OF {workout.exercises.length}
           </p>
-          <h2 className="font-headline-lg text-headline-lg text-on-surface uppercase">
+          <h2 className="font-headline-lg text-[28px] text-on-surface uppercase leading-tight">
             {currentExercise.name}
           </h2>
         </div>
@@ -120,7 +121,7 @@ export default function WorkoutSessionPage() {
               key={i}
               className={`h-1 flex-1 rounded-full transition-all duration-300 ${
                 i < currentIndex ? 'bg-primary-container' :
-                i === currentIndex ? 'bg-primary-container/60' : 'bg-surface-container-high'
+                i === currentIndex ? 'bg-primary-container/50' : 'bg-surface-container-high'
               }`}
             />
           ))}
@@ -136,13 +137,13 @@ export default function WorkoutSessionPage() {
         {/* Logged exercises this session */}
         {loggedExercises.length > 0 && (
           <div className="flex flex-col gap-xs">
-            <p className="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-widest">
+            <p className="font-label-caps text-label-caps text-on-surface-variant/70 uppercase tracking-widest">
               Logged ({loggedExercises.length})
             </p>
             {loggedExercises.map((ex, i) => (
-              <div key={i} className="bg-surface-container-high rounded-xl px-sm py-xs flex items-center justify-between border border-white/5">
-                <span className="font-body-md text-body-md text-on-surface">{ex.exercise_name}</span>
-                <span className="font-data-sm text-data-sm text-primary-container">
+              <div key={i} className="bg-surface-container rounded-xl px-sm py-xs flex items-center justify-between border border-white/[0.06]">
+                <span className="font-body-md text-[15px] text-on-surface">{ex.exercise_name}</span>
+                <span className="font-mono text-[12px] text-primary-container">
                   {ex.exercise_type === 'strength'
                     ? `${ex.sets}×${ex.reps} @ ${ex.weight_kg}kg`
                     : `${ex.duration_minutes}min`}
@@ -154,17 +155,17 @@ export default function WorkoutSessionPage() {
       </main>
 
       {/* Fixed Bottom: Finish Workout */}
-      <div className="fixed bottom-0 left-0 w-full max-w-md bg-gradient-to-t from-background via-background/90 to-transparent pt-12 pb-8 px-margin z-40">
+      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-gradient-to-t from-background via-background/95 to-transparent pt-10 pb-6 px-margin z-40">
         <button
           onClick={finishWorkout}
           disabled={saving || loggedExercises.length === 0}
-          className={`w-full font-headline-md text-headline-md py-4 rounded-xl transition-all duration-300 active:scale-[0.98] flex items-center justify-center gap-xs border-2 ${
+          className={`w-full font-label-caps text-[14px] py-4 rounded-xl transition-all duration-300 active:scale-[0.98] flex items-center justify-center gap-xs border font-bold tracking-wider ${
             loggedExercises.length > 0
-              ? 'border-primary-container text-primary-container hover:bg-primary-container hover:text-on-primary-container glow-primary'
-              : 'border-outline-variant text-on-surface-variant opacity-40 cursor-not-allowed'
+              ? 'border-primary-container text-primary-container hover:bg-primary-container hover:text-on-primary-container'
+              : 'border-white/10 text-on-surface-variant/30 cursor-not-allowed'
           }`}
         >
-          <span className="material-symbols-outlined">flag</span>
+          <span className="material-symbols-outlined text-[20px]">flag</span>
           {saving ? 'SAVING...' : 'FINISH WORKOUT'}
         </button>
       </div>
