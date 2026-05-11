@@ -119,4 +119,28 @@ describe('SessionChat', () => {
 
     expect(screen.queryByRole('button', { name: /ADD "(.*?)" TO PLAN/i })).not.toBeInTheDocument()
   })
+
+  it('shows multiple Add to Plan buttons when AI reply contains multiple bolded exercises', async () => {
+    ;(global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        reply: 'Here are two options: 1. **Push-Ups** and 2. **Dips**.',
+      }),
+    })
+
+    render(
+      <SessionChat
+        workout={mockWorkout}
+        currentExercise="Bench Press"
+        onClose={() => {}}
+        onAddExercise={jest.fn()}
+      />
+    )
+
+    fireEvent.click(screen.getByText('Suggest a substitute'))
+    await waitFor(() => screen.getByText(/ADD "PUSH-UPS" TO PLAN/i))
+    
+    expect(screen.getByText(/ADD "PUSH-UPS" TO PLAN/i)).toBeInTheDocument()
+    expect(screen.getByText(/ADD "DIPS" TO PLAN/i)).toBeInTheDocument()
+  })
 })
