@@ -20,11 +20,14 @@
       "^@/(.*)$": "<rootDir>/src/$1"
     },
     "transform": {
-      "^.+\\.tsx?$": ["ts-jest", {
-        "tsconfig": {
-          "jsx": "react-jsx"
+      "^.+\\.tsx?$": [
+        "ts-jest",
+        {
+          "tsconfig": {
+            "jsx": "react-jsx"
+          }
         }
-      }]
+      ]
     }
   },
   "dependencies": {
@@ -32,6 +35,7 @@
     "@supabase/supabase-js": "^2.105.4",
     "date-fns": "^4.1.0",
     "next": "14.2.35",
+    "posthog-js": "^1.372.10",
     "react": "^18",
     "react-dom": "^18",
     "recharts": "^3.8.1"

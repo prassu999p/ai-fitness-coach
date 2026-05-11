@@ -1,9 +1,22 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { callOpenRouter } from '@/lib/openrouter'
-import { buildWorkoutPrompt } from '@/lib/prompts'
-import { format } from 'date-fns'
-import type { SuggestedWorkout, WorkoutExercise, Workout } from '@/lib/types'
+import { buildWorkoutPrompt, buildWeeklyPlanPrompt } from '@/lib/prompts'
+import { format, startOfWeek } from 'date-fns'
+import type {
+  SuggestedWorkout,
+  WorkoutExercise,
+  Workout,
+  WeeklyPlan,
+  DayFocus,
+  DayKey,
+} from '@/lib/types'
+
+const DAY_KEYS: DayKey[] = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
+
+function dayKeyFor(date: Date): DayKey {
+  return DAY_KEYS[date.getDay()]
+}
 
 export async function POST() {
   const supabase = await createClient()
@@ -13,22 +26,11 @@ export async function POST() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const today = format(new Date(), 'yyyy-MM-dd')
-  const dayOfWeek = format(new Date(), 'EEEE')
+  const now = new Date()
+  const today = format(now, 'yyyy-MM-dd')
+  const dayOfWeek = format(now, 'EEEE')
+  const weekStart = format(startOfWeek(now, { weekStartsOn: 1 }), 'yyyy-MM-dd')
 
-  // Return cached suggestion if it exists for today
-  const { data: cached } = await supabase
-    .from('ai_suggestions')
-    .select('*')
-    .eq('user_id', user.id)
-    .eq('date', today)
-    .single()
-
-  if (cached) {
-    return NextResponse.json({ suggestion: cached.suggested_workout })
-  }
-
-  // Fetch profile and equipment
   const [{ data: profile }, { data: equipment }] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', user.id).single(),
     supabase.from('user_equipment').select('*').eq('user_id', user.id),
@@ -38,13 +40,12 @@ export async function POST() {
     return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
   }
 
-  // Fetch last 7 days of workout history with exercises
-  const sevenDaysAgo = format(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd')
+  const fourteenDaysAgo = format(new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd')
   const { data: recentWorkouts } = await supabase
     .from('workouts')
     .select('*, workout_exercises(*)')
     .eq('user_id', user.id)
-    .gte('date', sevenDaysAgo)
+    .gte('date', fourteenDaysAgo)
     .order('date', { ascending: false })
 
   const workoutsWithExercises = (recentWorkouts ?? []).map(w => ({
@@ -52,15 +53,105 @@ export async function POST() {
     exercises: (w.workout_exercises ?? []) as WorkoutExercise[],
   })) as Array<Workout & { exercises: WorkoutExercise[] }>
 
-  const prompt = buildWorkoutPrompt(profile, equipment ?? [], workoutsWithExercises, dayOfWeek)
   const model = process.env.OPENROUTER_MODEL ?? 'deepseek/deepseek-chat'
 
-  let suggestedWorkout: SuggestedWorkout
+  // 1. Ensure a weekly plan exists for this week.
+  let weeklyPlan: WeeklyPlan | null = null
+  const { data: existingPlan } = await supabase
+    .from('weekly_plans')
+    .select('*')
+    .eq('user_id', user.id)
+    .eq('week_start', weekStart)
+    .single()
 
+  if (existingPlan) {
+    weeklyPlan = existingPlan as WeeklyPlan
+  } else {
+    const planPrompt = buildWeeklyPlanPrompt(profile, equipment ?? [], workoutsWithExercises, weekStart)
+    let planJson: { split_type: WeeklyPlan['split_type']; day_slots: WeeklyPlan['day_slots'] }
+    try {
+      const raw = await callOpenRouter([{ role: 'user', content: planPrompt }], model)
+      const clean = raw.replace(/```json?\n?/g, '').replace(/```/g, '').trim()
+      planJson = JSON.parse(clean)
+    } catch {
+      planJson = {
+        split_type: profile.preferred_split === 'auto' ? 'full_body' : profile.preferred_split,
+        day_slots: {
+          mon: 'full_body', tue: 'rest', wed: 'full_body',
+          thu: 'rest', fri: 'full_body', sat: 'rest', sun: 'rest',
+        },
+      }
+    }
+
+    const { data: inserted, error: insertErr } = await supabase
+      .from('weekly_plans')
+      .upsert({
+        user_id: user.id,
+        week_start: weekStart,
+        split_type: planJson.split_type,
+        day_slots: planJson.day_slots,
+        model_used: model,
+      }, { onConflict: 'user_id,week_start', ignoreDuplicates: true })
+      .select()
+      .single()
+
+    if (insertErr || !inserted) {
+      // Another request may have inserted concurrently; try to re-select.
+      const { data: reFetched } = await supabase
+        .from('weekly_plans')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('week_start', weekStart)
+        .single()
+
+      weeklyPlan = (reFetched as WeeklyPlan) ?? {
+        id: '',
+        user_id: user.id,
+        week_start: weekStart,
+        split_type: planJson.split_type,
+        day_slots: planJson.day_slots,
+        model_used: model,
+        created_at: new Date().toISOString(),
+      } as WeeklyPlan
+    } else {
+      weeklyPlan = inserted as WeeklyPlan
+    }
+  }
+
+  // 2. Resolve today's focus.
+  const focus: DayFocus = weeklyPlan.day_slots[dayKeyFor(now)] ?? 'rest'
+
+  if (focus === 'rest') {
+    return NextResponse.json({
+      rest: true,
+      weeklyPlan,
+      focus,
+    })
+  }
+
+  // 3. Ensure today's per-day suggestion exists.
+  const { data: cached } = await supabase
+    .from('ai_suggestions')
+    .select('*')
+    .eq('user_id', user.id)
+    .eq('date', today)
+    .single()
+
+  if (cached) {
+    return NextResponse.json({
+      suggestion: cached.suggested_workout,
+      weeklyPlan,
+      focus,
+    })
+  }
+
+  const prompt = buildWorkoutPrompt(profile, equipment ?? [], workoutsWithExercises, dayOfWeek, focus)
+
+  let suggestedWorkout: SuggestedWorkout
   try {
     const raw = await callOpenRouter([{ role: 'user', content: prompt }], model)
-    const json = raw.replace(/```json?\n?/g, '').replace(/```/g, '').trim()
-    suggestedWorkout = JSON.parse(json)
+    const clean = raw.replace(/```json?\n?/g, '').replace(/```/g, '').trim()
+    suggestedWorkout = JSON.parse(clean)
   } catch {
     suggestedWorkout = {
       title: 'General Fitness',
@@ -81,5 +172,9 @@ export async function POST() {
     model_used: model,
   })
 
-  return NextResponse.json({ suggestion: suggestedWorkout })
+  return NextResponse.json({
+    suggestion: suggestedWorkout,
+    weeklyPlan,
+    focus,
+  })
 }
