@@ -4,22 +4,7 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import type { FitnessLevel } from '@/lib/types'
-
-const EQUIPMENT_OPTIONS = [
-  { name: 'Barbell', icon: '🏋️' },
-  { name: 'Dumbbells', icon: '💪' },
-  { name: 'Cables', icon: '🔗' },
-  { name: 'Smith Machine', icon: '⚙️' },
-  { name: 'Pull-up Bar', icon: '🔩' },
-  { name: 'Resistance Bands', icon: '🎯' },
-  { name: 'Treadmill', icon: '🏃' },
-  { name: 'Stationary Bike', icon: '🚴' },
-  { name: 'Rowing Machine', icon: '🚣' },
-  { name: 'Kettlebells', icon: '🔔' },
-  { name: 'Dip Bars', icon: '📊' },
-  { name: 'Leg Press', icon: '🦵' },
-  { name: 'Lat Pulldown', icon: '⬇️' },
-]
+import { EQUIPMENT_CATALOG, EQUIPMENT_CATEGORIES, type EquipmentCategory } from '@/lib/equipmentCatalog'
 
 const FITNESS_LEVELS: Array<{ value: FitnessLevel; label: string; description: string; icon: string }> = [
   { value: 'beginner', label: 'Beginner', description: '0–1 years training. Focus on form and baseline strength.', icon: 'stat_1' },
@@ -178,19 +163,28 @@ export default function OnboardingPage() {
                 Select everything available at your gym.
               </p>
             </div>
-            <div className="flex flex-wrap gap-xs flex-grow content-start">
-              {EQUIPMENT_OPTIONS.map(eq => (
-                <button
-                  key={eq.name}
-                  onClick={() => toggleEquipment(eq.name)}
-                  className={`px-sm py-xs rounded-full text-[13px] border transition-all duration-200 font-medium ${
-                    selectedEquipment.includes(eq.name)
-                      ? 'border-primary-container/40 bg-primary-container/10 text-primary-container'
-                      : 'border-white/[0.08] bg-surface-container-high text-on-surface-variant hover:border-white/[0.15]'
-                  }`}
-                >
-                  {eq.icon} {eq.name}
-                </button>
+            <div className="flex flex-col gap-sm flex-grow overflow-y-auto">
+              {(Object.keys(EQUIPMENT_CATEGORIES) as EquipmentCategory[]).map(cat => (
+                <div key={cat} className="flex flex-col gap-xs">
+                  <p className="font-label-caps text-[10px] text-on-surface-variant/50 tracking-widest uppercase">
+                    {EQUIPMENT_CATEGORIES[cat]}
+                  </p>
+                  <div className="flex flex-wrap gap-xs">
+                    {EQUIPMENT_CATALOG.filter(i => i.category === cat).map(it => (
+                      <button
+                        key={it.name}
+                        onClick={() => toggleEquipment(it.name)}
+                        className={`px-sm py-xs rounded-full text-[13px] border transition-all duration-200 font-medium ${
+                          selectedEquipment.includes(it.name)
+                            ? 'border-primary-container/40 bg-primary-container/10 text-primary-container'
+                            : 'border-white/[0.08] bg-surface-container-high text-on-surface-variant hover:border-white/[0.15]'
+                        }`}
+                      >
+                        {it.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
           </div>
