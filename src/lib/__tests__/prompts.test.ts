@@ -18,19 +18,36 @@ const recentWorkouts: Array<Workout & { exercises: WorkoutExercise[] }> = []
 
 describe('buildWorkoutPrompt', () => {
   it('includes fitness level in prompt', () => {
-    const prompt = buildWorkoutPrompt(profile, equipment, recentWorkouts, 'Monday')
+    const prompt = buildWorkoutPrompt(profile, equipment, recentWorkouts, 'Monday', 'full_body')
     expect(prompt).toContain('intermediate')
   })
 
   it('includes equipment names in prompt', () => {
-    const prompt = buildWorkoutPrompt(profile, equipment, recentWorkouts, 'Monday')
+    const prompt = buildWorkoutPrompt(profile, equipment, recentWorkouts, 'Monday', 'full_body')
     expect(prompt).toContain('barbell')
     expect(prompt).toContain('dumbbells')
   })
 
   it('requests JSON output', () => {
-    const prompt = buildWorkoutPrompt(profile, equipment, recentWorkouts, 'Monday')
+    const prompt = buildWorkoutPrompt(profile, equipment, recentWorkouts, 'Monday', 'full_body')
     expect(prompt).toContain('JSON')
+  })
+
+  it('mentions push-day muscle groups when focus is push', () => {
+    const prompt = buildWorkoutPrompt(profile, equipment, recentWorkouts, 'Monday', 'push')
+    expect(prompt.toLowerCase()).toContain('chest')
+    expect(prompt.toLowerCase()).toContain('triceps')
+  })
+
+  it('mentions pull-day muscle groups when focus is pull', () => {
+    const prompt = buildWorkoutPrompt(profile, equipment, recentWorkouts, 'Monday', 'pull')
+    expect(prompt.toLowerCase()).toContain('back')
+    expect(prompt.toLowerCase()).toContain('biceps')
+  })
+
+  it('includes the focus label verbatim', () => {
+    const prompt = buildWorkoutPrompt(profile, equipment, recentWorkouts, 'Monday', 'legs')
+    expect(prompt).toContain('legs')
   })
 })
 

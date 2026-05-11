@@ -1,10 +1,26 @@
-import type { Profile, Equipment, Workout, WorkoutExercise, SuggestedWorkout } from '@/lib/types'
+import type { Profile, Equipment, Workout, WorkoutExercise, SuggestedWorkout, DayFocus } from '@/lib/types'
+
+const FOCUS_MUSCLE_GUIDANCE: Record<DayFocus, string> = {
+  push:      'chest, shoulders, triceps',
+  pull:      'back, biceps, rear delts',
+  legs:      'quads, hamstrings, glutes, calves',
+  upper:     'chest, back, shoulders, biceps, triceps',
+  lower:     'quads, hamstrings, glutes, calves, core',
+  full_body: 'a balanced mix of upper and lower body',
+  chest:     'chest (with light triceps assistance only)',
+  back:      'back (with light biceps assistance only)',
+  shoulders: 'shoulders (front, side, rear delts)',
+  arms:      'biceps and triceps',
+  core:      'abs, obliques, lower back',
+  rest:      'recovery only — bodyweight mobility and light cardio',
+}
 
 export function buildWorkoutPrompt(
   profile: Profile,
   equipment: Equipment[],
   recentWorkouts: Array<Workout & { exercises: WorkoutExercise[] }>,
-  dayOfWeek: string
+  dayOfWeek: string,
+  dailyFocus: DayFocus,
 ): string {
   const equipmentList = equipment.map(e => e.equipment_name).join(', ') || 'bodyweight only'
 
@@ -19,7 +35,12 @@ export function buildWorkoutPrompt(
         return `${w.date} (${w.status}):\n  ${exList}`
       }).join('\n\n')
 
+  const focusGuidance = FOCUS_MUSCLE_GUIDANCE[dailyFocus]
+
   return `You are a personal gym trainer AI. Generate a workout for today (${dayOfWeek}).
+
+TODAY'S TRAINING FOCUS: ${dailyFocus}
+TARGET MUSCLE GROUPS for ${dailyFocus}: ${focusGuidance}
 
 USER PROFILE:
 - Fitness level: ${profile.fitness_level}
@@ -30,10 +51,10 @@ RECENT WORKOUT HISTORY (last 7 days):
 ${historySection}
 
 INSTRUCTIONS:
-- Only suggest exercises using the available equipment listed above
-- Avoid muscle groups trained in the last 24–48 hours
-- Apply progressive overload based on history (slightly more weight/reps than previous sessions)
-- Mix strength and cardio appropriate to the user's schedule
+- Pick exercises whose primary muscle groups STRICTLY match the focus "${dailyFocus}".
+- Only suggest exercises using the available equipment listed above.
+- Apply progressive overload based on history (slightly more weight/reps than previous sessions of the same exercise).
+- For "rest" focus, return at most 2 short mobility or light-cardio entries totalling ≤ 20 minutes.
 - Return ONLY a valid JSON object matching this exact schema:
 
 {
