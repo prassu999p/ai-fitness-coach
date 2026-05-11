@@ -1,4 +1,4 @@
-import type { Profile, Equipment, Workout, WorkoutExercise, SuggestedWorkout, SplitType } from '@/lib/types'
+import type { Profile, Equipment, Workout, WorkoutExercise, SuggestedWorkout } from '@/lib/types'
 
 export function buildWorkoutPrompt(
   profile: Profile,
@@ -96,10 +96,8 @@ export function buildWeeklyPlanPrompt(
   const historySection = recentWorkouts.length === 0
     ? 'No workout history — this is a new user.'
     : recentWorkouts.map(w => {
-        const groups = Array.from(new Set(w.exercises.flatMap(e => {
-          return [e.exercise_type]
-        })))
-        return `${w.date} (${w.status}): ${groups.join(', ')}`
+        const names = Array.from(new Set(w.exercises.map(e => e.exercise_name)))
+        return `${w.date} (${w.status}): ${names.join(', ')}`
       }).join('\n')
 
   const splitInstruction = profile.preferred_split === 'auto'
@@ -121,7 +119,7 @@ INSTRUCTIONS:
 - ${splitInstruction}
 - Assign a focus to each of the 7 days (mon..sun). Valid focus values: "push", "pull", "legs", "upper", "lower", "full_body", "chest", "back", "shoulders", "arms", "core", "rest".
 - Exactly ${profile.days_per_week} of the 7 days must be non-rest training days; the remaining must be "rest".
-- Do not repeat the exact same focus on two consecutive non-rest days.
+- Avoid repeating the same focus on consecutive non-rest days when the split permits (this constraint does not apply when split_type is "full_body").
 - Vary the pattern from the prior week if recent history is available.
 - Return ONLY a valid JSON object matching this schema:
 
