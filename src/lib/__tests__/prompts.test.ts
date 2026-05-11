@@ -1,10 +1,11 @@
-import { buildWorkoutPrompt, buildSessionChatPrompt } from '@/lib/prompts'
+import { buildWorkoutPrompt, buildSessionChatPrompt, buildWeeklyPlanPrompt } from '@/lib/prompts'
 import type { Profile, Equipment, Workout, WorkoutExercise, SuggestedWorkout } from '@/lib/types'
 
 const profile: Profile = {
   id: 'user-1',
   fitness_level: 'intermediate',
   days_per_week: 4,
+  preferred_split: 'auto',
   created_at: '2026-05-01T00:00:00Z',
 }
 
@@ -51,5 +52,32 @@ describe('buildSessionChatPrompt', () => {
   it('includes user message in prompt', () => {
     const prompt = buildSessionChatPrompt(todayWorkout, equipment, 'Bench Press', 'no flat bench available')
     expect(prompt).toContain('no flat bench available')
+  })
+})
+
+describe('buildWeeklyPlanPrompt', () => {
+  it('includes the preferred split when not auto', () => {
+    const fixedProfile = { ...profile, preferred_split: 'ppl' as const }
+    const prompt = buildWeeklyPlanPrompt(fixedProfile, equipment, [], '2026-05-11')
+    expect(prompt).toContain('ppl')
+    expect(prompt).toContain('honor')
+  })
+
+  it('asks the AI to choose when preferred split is auto', () => {
+    const prompt = buildWeeklyPlanPrompt(profile, equipment, [], '2026-05-11')
+    expect(prompt.toLowerCase()).toContain('choose')
+  })
+
+  it('includes days_per_week as a hard constraint', () => {
+    const prompt = buildWeeklyPlanPrompt(profile, equipment, [], '2026-05-11')
+    expect(prompt).toContain('4')
+    expect(prompt.toLowerCase()).toMatch(/non-rest|training day/)
+  })
+
+  it('asks for JSON with day_slots and split_type', () => {
+    const prompt = buildWeeklyPlanPrompt(profile, equipment, [], '2026-05-11')
+    expect(prompt).toContain('day_slots')
+    expect(prompt).toContain('split_type')
+    expect(prompt).toContain('JSON')
   })
 })
