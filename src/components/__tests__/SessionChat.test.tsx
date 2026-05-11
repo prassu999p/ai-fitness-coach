@@ -120,11 +120,11 @@ describe('SessionChat', () => {
     expect(screen.queryByRole('button', { name: /ADD "(.*?)" TO PLAN/i })).not.toBeInTheDocument()
   })
 
-  it('shows multiple Add to Plan buttons when AI reply contains multiple bolded exercises', async () => {
+  it('shows multiple Add to Plan buttons when AI reply contains multiple bolded exercises with substitute keywords', async () => {
     ;(global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
       json: async () => ({
-        reply: 'Here are two options: 1. **Push-Ups** and 2. **Dips**.',
+        reply: 'You can try these substitutes: 1. **Push-Ups** or 2. **Dips** instead.',
       }),
     })
 

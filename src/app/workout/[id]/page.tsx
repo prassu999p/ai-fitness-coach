@@ -16,10 +16,10 @@ export default function WorkoutSessionPage() {
   const [workout, setWorkout] = useState<SuggestedWorkout | null>(null)
   // Track which exercise index is currently being logged (expanded)
   const [activeIdx, setActiveIdx] = useState<number | null>(null)
-  // logged[] stores completed exercises — keyed by exercise name for dedup
+  // logged[] stores completed exercises — keyed by sort_order for deduplication of instances
   const [logged, setLogged] = useState<CompletedExercise[]>([])
-  // Names of exercises that were already saved to DB on a previous visit
-  const [preCompletedNames, setPreCompletedNames] = useState<Set<string>>(new Set())
+  // Indexes (sort_order) of exercises that were already saved to DB on a previous visit
+  const [preCompletedIdxs, setPreCompletedIdxs] = useState<Set<number>>(new Set())
   const [chatOpen, setChatOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [startTime] = useState(new Date())
@@ -29,18 +29,29 @@ export default function WorkoutSessionPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      // Load today's AI suggestion
-      const today = format(new Date(), 'yyyy-MM-dd')
-      const { data: suggestionData } = await supabase
-        .from('ai_suggestions')
-        .select('suggested_workout')
-        .eq('user_id', user.id)
-        .eq('date', today)
-        .single()
-      if (suggestionData) setWorkout(suggestionData.suggested_workout as SuggestedWorkout)
-
-      // Load already-logged exercises for this workout (Continue support)
+      // 1. Load the workout record to check for a snapshot
       if (params.id) {
+        const { data: workoutRecord } = await supabase
+          .from('workouts')
+          .select('suggestion_snapshot')
+          .eq('id', params.id as string)
+          .single()
+
+        if (workoutRecord?.suggestion_snapshot) {
+          setWorkout(workoutRecord.suggestion_snapshot as SuggestedWorkout)
+        } else {
+          // Fallback: Load today's global AI suggestion if no snapshot on the workout record
+          const today = format(new Date(), 'yyyy-MM-dd')
+          const { data: suggestionData } = await supabase
+            .from('ai_suggestions')
+            .select('suggested_workout')
+            .eq('user_id', user.id)
+            .eq('date', today)
+            .single()
+          if (suggestionData) setWorkout(suggestionData.suggested_workout as SuggestedWorkout)
+        }
+
+        // 2. Load already-logged exercises (Continue support)
         const { data: existingExercises } = await supabase
           .from('workout_exercises')
           .select('exercise_name, exercise_type, sets, reps, weight_kg, duration_minutes, perceived_effort, sort_order')
@@ -48,8 +59,8 @@ export default function WorkoutSessionPage() {
           .order('sort_order', { ascending: true })
 
         if (existingExercises && existingExercises.length > 0) {
-          // Mark these as pre-completed so they show as ✓ Done
-          setPreCompletedNames(new Set(existingExercises.map(e => e.exercise_name)))
+          // Mark these as pre-completed by their sort_order so we know which specific instance is done
+          setPreCompletedIdxs(new Set(existingExercises.map(e => e.sort_order)))
         }
       }
     }
@@ -59,8 +70,8 @@ export default function WorkoutSessionPage() {
 
   function handleComplete(entry: CompletedExercise, idx: number) {
     setLogged(prev => {
-      // Replace existing entry for same exercise if re-logged
-      const without = prev.filter(l => l.exercise.exercise_name !== entry.exercise.exercise_name)
+      // Replace existing entry for this specific instance (idx/sort_order) if re-logged
+      const without = prev.filter(l => l.exercise.sort_order !== idx)
       return [...without, { ...entry, exercise: { ...entry.exercise, sort_order: idx } }]
     })
     setActiveIdx(null) // collapse after logging
@@ -87,7 +98,7 @@ export default function WorkoutSessionPage() {
 
     if (logged.length > 0) {
       // Insert only newly logged exercises (not the pre-completed ones — they're already in DB)
-      const newlyLogged = logged.filter(l => !preCompletedNames.has(l.exercise.exercise_name))
+      const newlyLogged = logged.filter(l => !preCompletedIdxs.has(l.exercise.sort_order))
       if (newlyLogged.length > 0) {
         const { data: insertedExercises } = await supabase
           .from('workout_exercises')
@@ -130,8 +141,8 @@ export default function WorkoutSessionPage() {
     )
   }
 
-  const loggedNames = new Set(logged.map(l => l.exercise.exercise_name))
-  const completedCount = loggedNames.size + preCompletedNames.size
+  const loggedIdxs = new Set(logged.map(l => l.exercise.sort_order))
+  const completedCount = loggedIdxs.size + preCompletedIdxs.size
   const totalCount = workout.exercises.length
 
   return (
@@ -174,7 +185,7 @@ export default function WorkoutSessionPage() {
           </div>
           <div className="flex gap-1">
             {workout.exercises.map((ex, i) => {
-              const isDone = preCompletedNames.has(ex.name) || loggedNames.has(ex.name)
+              const isDone = preCompletedIdxs.has(i) || loggedIdxs.has(i)
               return (
                 <div
                   key={i}
@@ -190,7 +201,7 @@ export default function WorkoutSessionPage() {
         {/* All exercises list */}
         <div className="flex flex-col gap-sm">
           {workout.exercises.map((ex, i) => {
-            const isDone = preCompletedNames.has(ex.name) || loggedNames.has(ex.name)
+            const isDone = preCompletedIdxs.has(i) || loggedIdxs.has(i)
             const isActive = activeIdx === i
 
             return (

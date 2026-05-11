@@ -1,6 +1,6 @@
 export type FitnessLevel = 'beginner' | 'intermediate' | 'advanced'
 export type ExerciseType = 'strength' | 'cardio'
-export type WorkoutStatus = 'completed' | 'skipped'
+export type WorkoutStatus = 'completed' | 'skipped' | 'in_progress'
 export type SplitType = 'auto' | 'full_body' | 'upper_lower' | 'ppl' | 'body_part'
 export type DayKey   = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun'
 export type DayFocus =
@@ -28,6 +28,7 @@ export interface Workout {
   status: WorkoutStatus
   notes: string | null
   duration_minutes: number | null
+  suggestion_snapshot: SuggestedWorkout | null
   created_at: string
 }
 

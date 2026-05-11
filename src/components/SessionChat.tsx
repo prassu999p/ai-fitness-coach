@@ -19,35 +19,51 @@ const QUICK_PROMPTS = [
 
 /**
  * Heuristic to extract suggested exercise names from AI reply.
- * Looks for text in quotes, bold, or common patterns like "Try [Exercise]"
+ * Only returns names clearly presented as substitutes, excluding the current exercise.
  */
-function extractExerciseNames(text: string): string[] {
+function extractExerciseNames(text: string, currentExercise?: string): string[] {
   const names = new Set<string>()
+  const subVerbs = ['try', 'substitute', 'replace', 'use', 'instead of', 'swap with']
+  const subPattern = new RegExp(`(?:${subVerbs.join('|')})`, 'i')
+
+  const isNearSubVerb = (matchIndex: number) => {
+    const windowSize = 50
+    const start = Math.max(0, matchIndex - windowSize)
+    const end = Math.min(text.length, matchIndex + windowSize)
+    const context = text.slice(start, end)
+    return subPattern.test(context)
+  }
 
   // 1. Look for bold text **Exercise Name**
-  const boldMatches = text.matchAll(/\*\*(.*?)\*\*/g)
+  const boldMatches = Array.from(text.matchAll(/\*\*(.*?)\*\*/g))
   for (const match of boldMatches) {
     const name = match[1].trim()
-    if (name.length > 2 && name.length < 40 && !name.includes('\n')) {
-      names.add(name)
+    if (name.length > 2 && name.length < 40 && !name.includes('\n') && isNearSubVerb(match.index!)) {
+      if (!currentExercise || name.toLowerCase() !== currentExercise.toLowerCase()) {
+        names.add(name)
+      }
     }
   }
 
   // 2. Look for quoted text "Exercise Name"
-  const quoteMatches = text.matchAll(/"(.*?)"/g)
+  const quoteMatches = Array.from(text.matchAll(/"(.*?)"/g))
   for (const match of quoteMatches) {
     const name = match[1].trim()
-    if (name.length > 2 && name.length < 40 && !name.includes('\n')) {
-      names.add(name)
+    if (name.length > 2 && name.length < 40 && !name.includes('\n') && isNearSubVerb(match.index!)) {
+      if (!currentExercise || name.toLowerCase() !== currentExercise.toLowerCase()) {
+        names.add(name)
+      }
     }
   }
 
-  // 3. Look for "Try [Name]" or "Substitute with [Name]"
-  const tryMatches = text.matchAll(/(?:Try|try|Substitute with|substitute with) ([A-Z][a-z]+(?:\s[A-Z][a-z]+)*)/g)
+  // 3. Look for explicit patterns like "Try [Name]"
+  const tryMatches = Array.from(text.matchAll(/(?:Try|try|Substitute with|substitute with) ([A-Z][a-z]+(?:\s[A-Z][a-z]+)*)/g))
   for (const match of tryMatches) {
     const name = match[1].trim()
     if (name.length > 2 && name.length < 40) {
-      names.add(name)
+      if (!currentExercise || name.toLowerCase() !== currentExercise.toLowerCase()) {
+        names.add(name)
+      }
     }
   }
 
@@ -83,7 +99,7 @@ export function SessionChat({ workout, currentExercise, onClose, onAddExercise }
     }
   }
 
-  const suggestedNames = extractExerciseNames(reply)
+  const suggestedNames = extractExerciseNames(reply, currentExercise)
 
   return (
     /* Backdrop */

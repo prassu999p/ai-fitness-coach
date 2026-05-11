@@ -103,7 +103,7 @@ export default function DashboardPage() {
       setEquipmentCount(equipmentRows?.length ?? 0)
 
       const today = format(new Date(), 'yyyy-MM-dd')
-      const todayWorkout = (weekWorkouts ?? []).find(w => w.date === today)
+      const todayWorkout = (weekWorkouts ?? []).find(w => w.date === today && w.status === 'in_progress')
       const todayId = todayWorkout?.id ?? null
       setTodayWorkoutId(todayId)
 
@@ -114,6 +114,8 @@ export default function DashboardPage() {
           .select('id', { count: 'exact', head: true })
           .eq('workout_id', todayId)
         setTodayHasLoggedExercises((count ?? 0) > 0)
+      } else {
+        setTodayHasLoggedExercises(false)
       }
 
       const { data: allWorkouts } = await supabase
@@ -322,7 +324,12 @@ export default function DashboardPage() {
                   const { data: { user } } = await supabaseClient.auth.getUser()
                   if (!user) return
                   const todayDate = format(new Date(), 'yyyy-MM-dd')
-                  const { data } = await supabaseClient.from('workouts').insert({ user_id: user.id, date: todayDate, status: 'in_progress' }).select().single()
+                  const { data } = await supabaseClient.from('workouts').insert({
+                    user_id: user.id,
+                    date: todayDate,
+                    status: 'in_progress',
+                    suggestion_snapshot: suggestion,
+                  }).select().single()
                   if (data) {
                     setTodayWorkoutId(data.id)
                     router.push(`/workout/${data.id}`)
