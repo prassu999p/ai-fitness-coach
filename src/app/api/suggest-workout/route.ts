@@ -83,19 +83,39 @@ export async function POST() {
       }
     }
 
-    const { data: inserted } = await supabase
+    const { data: inserted, error: insertErr } = await supabase
       .from('weekly_plans')
-      .insert({
+      .upsert({
         user_id: user.id,
         week_start: weekStart,
         split_type: planJson.split_type,
         day_slots: planJson.day_slots,
         model_used: model,
-      })
+      }, { onConflict: 'user_id,week_start', ignoreDuplicates: true })
       .select()
       .single()
 
-    weeklyPlan = inserted as WeeklyPlan
+    if (insertErr || !inserted) {
+      // Another request may have inserted concurrently; try to re-select.
+      const { data: reFetched } = await supabase
+        .from('weekly_plans')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('week_start', weekStart)
+        .single()
+
+      weeklyPlan = (reFetched as WeeklyPlan) ?? {
+        id: '',
+        user_id: user.id,
+        week_start: weekStart,
+        split_type: planJson.split_type,
+        day_slots: planJson.day_slots,
+        model_used: model,
+        created_at: new Date().toISOString(),
+      } as WeeklyPlan
+    } else {
+      weeklyPlan = inserted as WeeklyPlan
+    }
   }
 
   // 2. Resolve today's focus.

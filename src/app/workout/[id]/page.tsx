@@ -62,15 +62,21 @@ export default function WorkoutSessionPage() {
       .select()
 
     if (insertedExercises) {
-      const setRows = insertedExercises.flatMap((ex, i) =>
-        logged[i].sets.map(s => ({
-          workout_exercise_id: ex.id,
+      // Build a map from sort_order → DB id for stable correlation
+      const exBySort = new Map(
+        insertedExercises.map(ex => [ex.sort_order as number, ex.id as string]),
+      )
+      const setRows = logged.flatMap(entry => {
+        const exId = exBySort.get(entry.exercise.sort_order)
+        if (!exId) return []
+        return entry.sets.map(s => ({
+          workout_exercise_id: exId,
           set_number: s.set_number,
           weight_kg: s.weight_kg,
           reps: s.reps,
           perceived_effort: s.perceived_effort,
-        })),
-      )
+        }))
+      })
       if (setRows.length > 0) {
         await supabase.from('workout_sets').insert(setRows)
       }
