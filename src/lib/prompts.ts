@@ -1,4 +1,4 @@
-import type { Profile, Equipment, Workout, WorkoutExercise, SuggestedWorkout } from '@/lib/types'
+import type { Profile, Equipment, Workout, WorkoutExercise, SuggestedWorkout, SplitType } from '@/lib/types'
 
 export function buildWorkoutPrompt(
   profile: Profile,
@@ -83,4 +83,59 @@ Suggest a substitute exercise that:
 3. Is appropriate for the user's current workout context
 
 Reply in 2–3 sentences: name the substitute, explain why it works, and give a brief cue for the first set.`
+}
+
+export function buildWeeklyPlanPrompt(
+  profile: Profile,
+  equipment: Equipment[],
+  recentWorkouts: Array<Workout & { exercises: WorkoutExercise[] }>,
+  weekStartDate: string,
+): string {
+  const equipmentList = equipment.map(e => e.equipment_name).join(', ') || 'bodyweight only'
+
+  const historySection = recentWorkouts.length === 0
+    ? 'No workout history — this is a new user.'
+    : recentWorkouts.map(w => {
+        const groups = Array.from(new Set(w.exercises.flatMap(e => {
+          return [e.exercise_type]
+        })))
+        return `${w.date} (${w.status}): ${groups.join(', ')}`
+      }).join('\n')
+
+  const splitInstruction = profile.preferred_split === 'auto'
+    ? 'Choose the most appropriate split_type for the user based on days_per_week and recent history.'
+    : `The user has chosen "${profile.preferred_split}" as their preferred split — you MUST honor that choice and set split_type accordingly.`
+
+  return `You are a personal gym trainer AI. Plan a 7-day training week starting Monday ${weekStartDate}.
+
+USER PROFILE:
+- Fitness level: ${profile.fitness_level}
+- Training days per week: ${profile.days_per_week}
+- Preferred split: ${profile.preferred_split}
+- Available equipment: ${equipmentList}
+
+RECENT WORKOUT HISTORY (last 14 days):
+${historySection}
+
+INSTRUCTIONS:
+- ${splitInstruction}
+- Assign a focus to each of the 7 days (mon..sun). Valid focus values: "push", "pull", "legs", "upper", "lower", "full_body", "chest", "back", "shoulders", "arms", "core", "rest".
+- Exactly ${profile.days_per_week} of the 7 days must be non-rest training days; the remaining must be "rest".
+- Do not repeat the exact same focus on two consecutive non-rest days.
+- Vary the pattern from the prior week if recent history is available.
+- Return ONLY a valid JSON object matching this schema:
+
+{
+  "split_type": "auto" | "full_body" | "upper_lower" | "ppl" | "body_part",
+  "rationale": "string (1-2 sentences)",
+  "day_slots": {
+    "mon": "<focus>",
+    "tue": "<focus>",
+    "wed": "<focus>",
+    "thu": "<focus>",
+    "fri": "<focus>",
+    "sat": "<focus>",
+    "sun": "<focus>"
+  }
+}`
 }
