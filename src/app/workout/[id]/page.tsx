@@ -139,6 +139,7 @@ export default function WorkoutSessionPage() {
         </div>
 
         <ExerciseLogger
+          key={currentIndex}
           exercise={currentExercise}
           onComplete={handleComplete}
           sortOrder={currentIndex}

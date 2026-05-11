@@ -140,7 +140,7 @@ export default function PostWorkoutLogPage() {
         </div>
 
         {/* Exercise Logger */}
-        <ExerciseLogger exercise={activeExercise} onComplete={handleComplete} sortOrder={logged.length} />
+        <ExerciseLogger key={`${activeExercise.name}-${logged.length}`} exercise={activeExercise} onComplete={handleComplete} sortOrder={logged.length} />
 
         {/* Logged exercises */}
         {logged.length > 0 && (
