@@ -1,25 +1,36 @@
 import { format, startOfWeek, addDays } from 'date-fns'
-import type { Workout } from '@/lib/types'
+import type { Workout, WeeklyPlan, DayKey } from '@/lib/types'
 
 interface Props {
   workouts: Workout[]
+  weeklyPlan?: WeeklyPlan | null
 }
 
 const DAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
+const DAY_KEYS: DayKey[] = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
 
-export function WeeklyStrip({ workouts }: Props) {
+const FOCUS_SHORT: Record<string, string> = {
+  push: 'PUSH', pull: 'PULL', legs: 'LEGS',
+  upper: 'UPR', lower: 'LWR', full_body: 'FULL',
+  chest: 'CHST', back: 'BACK', shoulders: 'SHLD',
+  arms: 'ARMS', core: 'CORE', rest: 'REST',
+}
+
+export function WeeklyStrip({ workouts, weeklyPlan }: Props) {
   const today = format(new Date(), 'yyyy-MM-dd')
   const monday = startOfWeek(new Date(), { weekStartsOn: 1 })
   const days = Array.from({ length: 7 }, (_, i) => addDays(monday, i))
 
   return (
     <section aria-label="Weekly Workout Status">
-      <div className="flex justify-between items-center bg-surface-container-low rounded-xl p-4 border border-white/5 shadow-[0_4px_20px_rgba(0,0,0,0.5)]">
+      <div className="flex justify-between items-end bg-surface-container-low rounded-xl p-4 border border-white/5 shadow-[0_4px_20px_rgba(0,0,0,0.5)]">
         {days.map((day, i) => {
           const dateStr = format(day, 'yyyy-MM-dd')
           const isToday = dateStr === today
           const isFuture = dateStr > today
           const workout = workouts.find(w => w.date === dateStr)
+          const focus = weeklyPlan?.day_slots?.[DAY_KEYS[i]]
+          const focusLabel = focus ? FOCUS_SHORT[focus] ?? focus.toUpperCase() : null
 
           return (
             <div key={dateStr} className="flex flex-col items-center gap-xs relative">
@@ -47,8 +58,14 @@ export function WeeklyStrip({ workouts }: Props) {
                 </div>
               )}
 
+              {focusLabel && (
+                <span className={`font-mono text-[9px] tracking-widest ${focus === 'rest' ? 'text-on-surface-variant/40' : 'text-primary-container/70'}`}>
+                  {focusLabel}
+                </span>
+              )}
+
               {isToday && (
-                <div className="absolute -bottom-2 w-4 h-[2px] bg-primary-container rounded-full" />
+                <div className="absolute -bottom-3 w-4 h-[2px] bg-primary-container rounded-full" />
               )}
             </div>
           )
