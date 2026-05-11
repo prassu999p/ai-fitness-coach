@@ -3,10 +3,10 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { ExerciseLogger } from '@/components/ExerciseLogger'
+import { ExerciseLogger, type CompletedExercise } from '@/components/ExerciseLogger'
 import { SessionChat } from '@/components/SessionChat'
 import { format } from 'date-fns'
-import type { SuggestedWorkout, WorkoutExercise } from '@/lib/types'
+import type { SuggestedWorkout } from '@/lib/types'
 
 export default function WorkoutSessionPage() {
   const params = useParams()
@@ -15,7 +15,7 @@ export default function WorkoutSessionPage() {
 
   const [workout, setWorkout] = useState<SuggestedWorkout | null>(null)
   const [currentIndex, setCurrentIndex] = useState(0)
-  const [loggedExercises, setLoggedExercises] = useState<Omit<WorkoutExercise, 'id' | 'workout_id'>[]>([])
+  const [logged, setLogged] = useState<CompletedExercise[]>([])
   const [chatOpen, setChatOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [startTime] = useState(new Date())
@@ -24,7 +24,6 @@ export default function WorkoutSessionPage() {
     async function loadSuggestion() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
-
       const today = format(new Date(), 'yyyy-MM-dd')
       const { data } = await supabase
         .from('ai_suggestions')
@@ -32,21 +31,20 @@ export default function WorkoutSessionPage() {
         .eq('user_id', user.id)
         .eq('date', today)
         .single()
-
       if (data) setWorkout(data.suggested_workout as SuggestedWorkout)
     }
     loadSuggestion()
   }, [])
 
-  function handleLog(entry: Omit<WorkoutExercise, 'id' | 'workout_id'>) {
-    setLoggedExercises(prev => [...prev, { ...entry, sort_order: currentIndex }])
+  function handleComplete(entry: CompletedExercise) {
+    setLogged(prev => [...prev, { ...entry, exercise: { ...entry.exercise, sort_order: currentIndex } }])
     if (workout && currentIndex < workout.exercises.length - 1) {
       setCurrentIndex(prev => prev + 1)
     }
   }
 
   async function finishWorkout() {
-    if (loggedExercises.length === 0 || !params.id) return
+    if (logged.length === 0 || !params.id) return
     setSaving(true)
 
     await supabase
@@ -57,9 +55,26 @@ export default function WorkoutSessionPage() {
       })
       .eq('id', params.id as string)
 
-    await supabase.from('workout_exercises').insert(
-      loggedExercises.map(ex => ({ ...ex, workout_id: params.id as string }))
-    )
+    // Insert workout_exercises and capture their IDs so we can insert workout_sets.
+    const { data: insertedExercises } = await supabase
+      .from('workout_exercises')
+      .insert(logged.map(l => ({ ...l.exercise, workout_id: params.id as string })))
+      .select()
+
+    if (insertedExercises) {
+      const setRows = insertedExercises.flatMap((ex, i) =>
+        logged[i].sets.map(s => ({
+          workout_exercise_id: ex.id,
+          set_number: s.set_number,
+          weight_kg: s.weight_kg,
+          reps: s.reps,
+          perceived_effort: s.perceived_effort,
+        })),
+      )
+      if (setRows.length > 0) {
+        await supabase.from('workout_sets').insert(setRows)
+      }
+    }
 
     router.push('/dashboard')
   }
@@ -79,7 +94,6 @@ export default function WorkoutSessionPage() {
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
-      {/* Fixed Header */}
       <header className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-md z-50 bg-surface/80 backdrop-blur-xl border-b border-white/[0.06]">
         <div className="flex justify-between items-center px-margin h-14">
           <button onClick={() => router.back()} className="text-on-surface-variant hover:text-primary-container transition-colors p-1 -ml-1">
@@ -98,13 +112,11 @@ export default function WorkoutSessionPage() {
       </header>
 
       <main className="flex-grow pt-[72px] pb-[120px] px-margin flex flex-col gap-md">
-        {/* Session Active Indicator */}
         <div className="flex items-center gap-xs bg-surface-container px-sm py-xs rounded-full border border-white/[0.08] self-start">
           <div className="w-2 h-2 rounded-full bg-primary-container animate-pulse" />
           <span className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Session Active</span>
         </div>
 
-        {/* Exercise counter */}
         <div>
           <p className="font-label-caps text-label-caps text-primary-container/70 tracking-widest mb-[4px]">
             EXERCISE {currentIndex + 1} OF {workout.exercises.length}
@@ -114,7 +126,6 @@ export default function WorkoutSessionPage() {
           </h2>
         </div>
 
-        {/* Progress bar */}
         <div className="flex gap-1">
           {workout.exercises.map((_, i) => (
             <div
@@ -127,26 +138,24 @@ export default function WorkoutSessionPage() {
           ))}
         </div>
 
-        {/* Exercise Logger */}
         <ExerciseLogger
           exercise={currentExercise}
-          onLog={handleLog}
+          onComplete={handleComplete}
           sortOrder={currentIndex}
         />
 
-        {/* Logged exercises this session */}
-        {loggedExercises.length > 0 && (
+        {logged.length > 0 && (
           <div className="flex flex-col gap-xs">
             <p className="font-label-caps text-label-caps text-on-surface-variant/70 uppercase tracking-widest">
-              Logged ({loggedExercises.length})
+              Logged ({logged.length})
             </p>
-            {loggedExercises.map((ex, i) => (
+            {logged.map((entry, i) => (
               <div key={i} className="bg-surface-container rounded-xl px-sm py-xs flex items-center justify-between border border-white/[0.06]">
-                <span className="font-body-md text-[15px] text-on-surface">{ex.exercise_name}</span>
+                <span className="font-body-md text-[15px] text-on-surface">{entry.exercise.exercise_name}</span>
                 <span className="font-mono text-[12px] text-primary-container">
-                  {ex.exercise_type === 'strength'
-                    ? `${ex.sets}×${ex.reps} @ ${ex.weight_kg}kg`
-                    : `${ex.duration_minutes}min`}
+                  {entry.exercise.exercise_type === 'strength'
+                    ? `${entry.sets.length} sets`
+                    : `${entry.exercise.duration_minutes}min`}
                 </span>
               </div>
             ))}
@@ -154,13 +163,12 @@ export default function WorkoutSessionPage() {
         )}
       </main>
 
-      {/* Fixed Bottom: Finish Workout */}
       <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-gradient-to-t from-background via-background/95 to-transparent pt-10 pb-6 px-margin z-40">
         <button
           onClick={finishWorkout}
-          disabled={saving || loggedExercises.length === 0}
+          disabled={saving || logged.length === 0}
           className={`w-full font-label-caps text-[14px] py-4 rounded-xl transition-all duration-300 active:scale-[0.98] flex items-center justify-center gap-xs border font-bold tracking-wider ${
-            loggedExercises.length > 0
+            logged.length > 0
               ? 'border-primary-container text-primary-container hover:bg-primary-container hover:text-on-primary-container'
               : 'border-white/10 text-on-surface-variant/30 cursor-not-allowed'
           }`}
@@ -170,7 +178,6 @@ export default function WorkoutSessionPage() {
         </button>
       </div>
 
-      {/* Session Chat Overlay */}
       {chatOpen && (
         <SessionChat
           workout={workout}
