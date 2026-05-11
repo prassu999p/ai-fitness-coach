@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { ExerciseLogger, type CompletedExercise } from '@/components/ExerciseLogger'
 import { SessionChat } from '@/components/SessionChat'
 import { format } from 'date-fns'
-import type { SuggestedWorkout } from '@/lib/types'
+import type { SuggestedWorkout, SuggestedExercise } from '@/lib/types'
 
 export default function WorkoutSessionPage() {
   const params = useParams()
@@ -14,71 +14,105 @@ export default function WorkoutSessionPage() {
   const supabase = createClient()
 
   const [workout, setWorkout] = useState<SuggestedWorkout | null>(null)
-  const [currentIndex, setCurrentIndex] = useState(0)
+  // Track which exercise index is currently being logged (expanded)
+  const [activeIdx, setActiveIdx] = useState<number | null>(null)
+  // logged[] stores completed exercises — keyed by exercise name for dedup
   const [logged, setLogged] = useState<CompletedExercise[]>([])
+  // Names of exercises that were already saved to DB on a previous visit
+  const [preCompletedNames, setPreCompletedNames] = useState<Set<string>>(new Set())
   const [chatOpen, setChatOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [startTime] = useState(new Date())
 
   useEffect(() => {
-    async function loadSuggestion() {
+    async function loadData() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
+
+      // Load today's AI suggestion
       const today = format(new Date(), 'yyyy-MM-dd')
-      const { data } = await supabase
+      const { data: suggestionData } = await supabase
         .from('ai_suggestions')
         .select('suggested_workout')
         .eq('user_id', user.id)
         .eq('date', today)
         .single()
-      if (data) setWorkout(data.suggested_workout as SuggestedWorkout)
+      if (suggestionData) setWorkout(suggestionData.suggested_workout as SuggestedWorkout)
+
+      // Load already-logged exercises for this workout (Continue support)
+      if (params.id) {
+        const { data: existingExercises } = await supabase
+          .from('workout_exercises')
+          .select('exercise_name, exercise_type, sets, reps, weight_kg, duration_minutes, perceived_effort, sort_order')
+          .eq('workout_id', params.id as string)
+          .order('sort_order', { ascending: true })
+
+        if (existingExercises && existingExercises.length > 0) {
+          // Mark these as pre-completed so they show as ✓ Done
+          setPreCompletedNames(new Set(existingExercises.map(e => e.exercise_name)))
+        }
+      }
     }
-    loadSuggestion()
+    loadData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  function handleComplete(entry: CompletedExercise) {
-    setLogged(prev => [...prev, { ...entry, exercise: { ...entry.exercise, sort_order: currentIndex } }])
-    if (workout && currentIndex < workout.exercises.length - 1) {
-      setCurrentIndex(prev => prev + 1)
-    }
+  function handleComplete(entry: CompletedExercise, idx: number) {
+    setLogged(prev => {
+      // Replace existing entry for same exercise if re-logged
+      const without = prev.filter(l => l.exercise.exercise_name !== entry.exercise.exercise_name)
+      return [...without, { ...entry, exercise: { ...entry.exercise, sort_order: idx } }]
+    })
+    setActiveIdx(null) // collapse after logging
+  }
+
+  function handleAddExercise(exercise: SuggestedExercise) {
+    setWorkout(prev => {
+      if (!prev) return prev
+      return { ...prev, exercises: [...prev.exercises, exercise] }
+    })
+    setChatOpen(false)
   }
 
   async function finishWorkout() {
-    if (logged.length === 0 || !params.id) return
+    if (!params.id) return
     setSaving(true)
+
+    const durationMinutes = Math.round((Date.now() - startTime.getTime()) / 60000)
 
     await supabase
       .from('workouts')
-      .update({
-        status: 'completed',
-        duration_minutes: Math.round((Date.now() - startTime.getTime()) / 60000),
-      })
+      .update({ status: 'completed', duration_minutes: durationMinutes })
       .eq('id', params.id as string)
 
-    // Insert workout_exercises and capture their IDs so we can insert workout_sets.
-    const { data: insertedExercises } = await supabase
-      .from('workout_exercises')
-      .insert(logged.map(l => ({ ...l.exercise, workout_id: params.id as string })))
-      .select()
+    if (logged.length > 0) {
+      // Insert only newly logged exercises (not the pre-completed ones — they're already in DB)
+      const newlyLogged = logged.filter(l => !preCompletedNames.has(l.exercise.exercise_name))
+      if (newlyLogged.length > 0) {
+        const { data: insertedExercises } = await supabase
+          .from('workout_exercises')
+          .insert(newlyLogged.map(l => ({ ...l.exercise, workout_id: params.id as string })))
+          .select()
 
-    if (insertedExercises) {
-      // Build a map from sort_order → DB id for stable correlation
-      const exBySort = new Map(
-        insertedExercises.map(ex => [ex.sort_order as number, ex.id as string]),
-      )
-      const setRows = logged.flatMap(entry => {
-        const exId = exBySort.get(entry.exercise.sort_order)
-        if (!exId) return []
-        return entry.sets.map(s => ({
-          workout_exercise_id: exId,
-          set_number: s.set_number,
-          weight_kg: s.weight_kg,
-          reps: s.reps,
-          perceived_effort: s.perceived_effort,
-        }))
-      })
-      if (setRows.length > 0) {
-        await supabase.from('workout_sets').insert(setRows)
+        if (insertedExercises) {
+          const exBySort = new Map(
+            insertedExercises.map(ex => [ex.sort_order as number, ex.id as string]),
+          )
+          const setRows = newlyLogged.flatMap(entry => {
+            const exId = exBySort.get(entry.exercise.sort_order)
+            if (!exId) return []
+            return entry.sets.map(s => ({
+              workout_exercise_id: exId,
+              set_number: s.set_number,
+              weight_kg: s.weight_kg,
+              reps: s.reps,
+              perceived_effort: s.perceived_effort,
+            }))
+          })
+          if (setRows.length > 0) {
+            await supabase.from('workout_sets').insert(setRows)
+          }
+        }
       }
     }
 
@@ -96,7 +130,9 @@ export default function WorkoutSessionPage() {
     )
   }
 
-  const currentExercise = workout.exercises[currentIndex]
+  const loggedNames = new Set(logged.map(l => l.exercise.exercise_name))
+  const completedCount = loggedNames.size + preCompletedNames.size
+  const totalCount = workout.exercises.length
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -118,78 +154,139 @@ export default function WorkoutSessionPage() {
       </header>
 
       <main className="flex-grow pt-[72px] pb-[120px] px-margin flex flex-col gap-md">
-        <div className="flex items-center gap-xs bg-surface-container px-sm py-xs rounded-full border border-white/[0.08] self-start">
-          <div className="w-2 h-2 rounded-full bg-primary-container animate-pulse" />
-          <span className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Session Active</span>
-        </div>
-
-        <div>
-          <p className="font-label-caps text-label-caps text-primary-container/70 tracking-widest mb-[4px]">
-            EXERCISE {currentIndex + 1} OF {workout.exercises.length}
-          </p>
-          <h2 className="font-headline-lg text-[28px] text-on-surface uppercase leading-tight">
-            {currentExercise.name}
-          </h2>
-        </div>
-
-        <div className="flex gap-1">
-          {workout.exercises.map((_, i) => (
-            <div
-              key={i}
-              className={`h-1 flex-1 rounded-full transition-all duration-300 ${
-                i < currentIndex ? 'bg-primary-container' :
-                i === currentIndex ? 'bg-primary-container/50' : 'bg-surface-container-high'
-              }`}
-            />
-          ))}
-        </div>
-
-        <ExerciseLogger
-          key={currentIndex}
-          exercise={currentExercise}
-          onComplete={handleComplete}
-          sortOrder={currentIndex}
-        />
-
-        {logged.length > 0 && (
-          <div className="flex flex-col gap-xs">
-            <p className="font-label-caps text-label-caps text-on-surface-variant/70 uppercase tracking-widest">
-              Logged ({logged.length})
-            </p>
-            {logged.map((entry, i) => (
-              <div key={i} className="bg-surface-container rounded-xl px-sm py-xs flex items-center justify-between border border-white/[0.06]">
-                <span className="font-body-md text-[15px] text-on-surface">{entry.exercise.exercise_name}</span>
-                <span className="font-mono text-[12px] text-primary-container">
-                  {entry.exercise.exercise_type === 'strength'
-                    ? `${entry.sets.length} sets`
-                    : `${entry.exercise.duration_minutes}min`}
-                </span>
-              </div>
-            ))}
+        {/* Status pill */}
+        <div className="flex items-center gap-sm">
+          <div className="flex items-center gap-xs bg-surface-container px-sm py-xs rounded-full border border-white/[0.08]">
+            <div className="w-2 h-2 rounded-full bg-primary-container animate-pulse" />
+            <span className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Session Active</span>
           </div>
-        )}
+        </div>
+
+        {/* Progress bar */}
+        <div className="flex flex-col gap-xs">
+          <div className="flex items-center justify-between">
+            <p className="font-label-caps text-label-caps text-primary-container/70 tracking-widest">
+              {completedCount} OF {totalCount} EXERCISES
+            </p>
+            {completedCount > 0 && completedCount === totalCount && (
+              <span className="font-label-caps text-[10px] text-primary-container tracking-widest">ALL DONE ✓</span>
+            )}
+          </div>
+          <div className="flex gap-1">
+            {workout.exercises.map((ex, i) => {
+              const isDone = preCompletedNames.has(ex.name) || loggedNames.has(ex.name)
+              return (
+                <div
+                  key={i}
+                  className={`h-1.5 flex-1 rounded-full transition-all duration-300 ${
+                    isDone ? 'bg-primary-container' : 'bg-surface-container-high'
+                  }`}
+                />
+              )
+            })}
+          </div>
+        </div>
+
+        {/* All exercises list */}
+        <div className="flex flex-col gap-sm">
+          {workout.exercises.map((ex, i) => {
+            const isDone = preCompletedNames.has(ex.name) || loggedNames.has(ex.name)
+            const isActive = activeIdx === i
+
+            return (
+              <div
+                key={`${ex.name}-${i}`}
+                className={`rounded-2xl border overflow-hidden transition-all duration-200 ${
+                  isDone
+                    ? 'border-primary-container/30 bg-primary-container/5'
+                    : isActive
+                    ? 'border-primary-container/50 bg-surface-container'
+                    : 'border-white/[0.06] bg-surface-container'
+                }`}
+              >
+                {/* Exercise header row */}
+                <div className="flex items-center justify-between px-sm py-sm gap-xs">
+                  <div className="flex items-center gap-xs min-w-0 flex-1">
+                    {/* Status icon */}
+                    {isDone ? (
+                      <div className="w-7 h-7 rounded-full bg-primary-container/15 border border-primary-container flex items-center justify-center flex-shrink-0">
+                        <span className="material-symbols-outlined text-[15px] text-primary-container" style={{ fontVariationSettings: "'wght' 600" }}>check</span>
+                      </div>
+                    ) : (
+                      <div className="w-7 h-7 rounded-full bg-surface-container-high border border-white/10 flex items-center justify-center flex-shrink-0">
+                        <span className="font-mono text-[11px] text-on-surface-variant">{i + 1}</span>
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <p className={`font-headline-md text-[15px] uppercase leading-tight truncate ${isDone ? 'text-primary-container' : 'text-on-surface'}`}>
+                        {ex.name}
+                      </p>
+                      <p className="font-label-caps text-[9px] text-on-surface-variant/50 tracking-widest mt-[1px]">
+                        {ex.muscle_groups.join(' · ').toUpperCase()}
+                        {ex.type === 'strength' && ex.sets && ` · ${ex.sets}×${ex.reps ?? '?'}`}
+                        {ex.type === 'cardio' && ex.duration_minutes && ` · ${ex.duration_minutes}min`}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Action button */}
+                  {isDone ? (
+                    <span className="font-label-caps text-[10px] text-primary-container/70 tracking-widest flex-shrink-0">DONE</span>
+                  ) : (
+                    <button
+                      id={`log-exercise-${i}`}
+                      onClick={() => setActiveIdx(isActive ? null : i)}
+                      className={`flex-shrink-0 flex items-center gap-[4px] font-label-caps text-[11px] tracking-wider px-sm py-xs rounded-xl transition-all border ${
+                        isActive
+                          ? 'bg-surface-container-high border-white/10 text-on-surface-variant'
+                          : 'bg-primary-container/10 border-primary-container/30 text-primary-container hover:bg-primary-container/20'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-[14px]">{isActive ? 'keyboard_arrow_up' : 'edit'}</span>
+                      {isActive ? 'HIDE' : 'LOG'}
+                    </button>
+                  )}
+                </div>
+
+                {/* Inline logger — expands below header */}
+                {isActive && !isDone && (
+                  <div className="border-t border-white/[0.06] px-sm pb-sm pt-xs">
+                    <ExerciseLogger
+                      key={`logger-${i}`}
+                      exercise={ex}
+                      onComplete={entry => handleComplete(entry, i)}
+                      sortOrder={i}
+                    />
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
       </main>
 
+      {/* Finish button */}
       <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-gradient-to-t from-background via-background/95 to-transparent pt-10 pb-6 px-margin z-40">
         <button
           onClick={finishWorkout}
-          disabled={saving || logged.length === 0}
+          disabled={saving || completedCount === 0}
           className={`w-full font-label-caps text-[14px] py-4 rounded-xl transition-all duration-300 active:scale-[0.98] flex items-center justify-center gap-xs border font-bold tracking-wider ${
-            logged.length > 0
+            completedCount > 0
               ? 'border-primary-container text-primary-container hover:bg-primary-container hover:text-on-primary-container'
               : 'border-white/10 text-on-surface-variant/30 cursor-not-allowed'
           }`}
         >
           <span className="material-symbols-outlined text-[20px]">flag</span>
-          {saving ? 'SAVING...' : 'FINISH WORKOUT'}
+          {saving ? 'SAVING...' : completedCount === totalCount ? 'FINISH WORKOUT ✓' : `FINISH (${completedCount}/${totalCount})`}
         </button>
       </div>
 
       {chatOpen && (
         <SessionChat
           workout={workout}
-          currentExercise={currentExercise.name}
+          currentExercise={activeIdx !== null ? workout.exercises[activeIdx]?.name ?? workout.exercises[0].name : workout.exercises[0].name}
           onClose={() => setChatOpen(false)}
+          onAddExercise={handleAddExercise}
         />
       )}
     </div>

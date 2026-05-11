@@ -1,12 +1,13 @@
 'use client'
 
 import { useState } from 'react'
-import type { SuggestedWorkout } from '@/lib/types'
+import type { SuggestedWorkout, SuggestedExercise } from '@/lib/types'
 
 interface Props {
   workout: SuggestedWorkout
   currentExercise: string
   onClose: () => void
+  onAddExercise?: (exercise: SuggestedExercise) => void
 }
 
 const QUICK_PROMPTS = [
@@ -16,7 +17,28 @@ const QUICK_PROMPTS = [
   "Suggest a substitute",
 ]
 
-export function SessionChat({ workout, currentExercise, onClose }: Props) {
+/**
+ * Heuristic to extract a suggested exercise name from AI reply.
+ * Looks for text in quotes, bold, or common patterns like "Try [Exercise]"
+ */
+function extractExerciseName(text: string): string | null {
+  // 1. Look for bold text **Exercise Name**
+  const boldMatch = text.match(/\*\*(.*?)\*\*/)
+  if (boldMatch?.[1]) return boldMatch[1]
+
+  // 2. Look for quoted text "Exercise Name"
+  const quoteMatch = text.match(/"(.*?)"/)
+  if (quoteMatch?.[1]) return quoteMatch[1]
+
+  // 3. Look for "Try [Name]" or "Substitute with [Name]"
+  // This is riskier but covers more ground.
+  const tryMatch = text.match(/(?:Try|try|Substitute with|substitute with) ([A-Z][a-z]+(?:\s[A-Z][a-z]+)*)/)
+  if (tryMatch?.[1]) return tryMatch[1]
+
+  return null
+}
+
+export function SessionChat({ workout, currentExercise, onClose, onAddExercise }: Props) {
   const [message, setMessage] = useState('')
   const [reply, setReply] = useState('')
   const [loading, setLoading] = useState(false)
@@ -44,6 +66,9 @@ export function SessionChat({ workout, currentExercise, onClose }: Props) {
       setLoading(false)
     }
   }
+
+  const suggestedName = extractExerciseName(reply)
+  const isSubstituteRequest = message.toLowerCase().includes('substitute') || message.toLowerCase().includes('no equipment')
 
   return (
     /* Backdrop */
@@ -76,12 +101,34 @@ export function SessionChat({ workout, currentExercise, onClose }: Props) {
 
         {/* AI Reply */}
         {reply && (
-          <div className="bg-surface-container border border-primary-container/20 rounded-xl p-sm shadow-[0_0_20px_rgba(195,244,0,0.05)]">
-            <div className="flex items-center gap-xs mb-xs">
-              <span className="material-symbols-outlined text-primary-container text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>smart_toy</span>
-              <span className="font-label-caps text-label-caps text-primary-container tracking-widest">AI TRAINER</span>
+          <div className="flex flex-col gap-sm">
+            <div className="bg-surface-container border border-primary-container/20 rounded-xl p-sm shadow-[0_0_20px_rgba(195,244,0,0.05)]">
+              <div className="flex items-center gap-xs mb-xs">
+                <span className="material-symbols-outlined text-primary-container text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>smart_toy</span>
+                <span className="font-label-caps text-label-caps text-primary-container tracking-widest">AI TRAINER</span>
+              </div>
+              <p className="font-body-md text-body-md text-on-surface whitespace-pre-wrap">{reply}</p>
             </div>
-            <p className="font-body-md text-body-md text-on-surface">{reply}</p>
+
+            {/* Add to plan action if substitute detected */}
+            {onAddExercise && suggestedName && (isSubstituteRequest || reply.length < 200) && (
+              <button
+                id="add-substitute-btn"
+                onClick={() => {
+                  onAddExercise({
+                    name: suggestedName,
+                    type: 'strength', // Default to strength, AI can specify if we expand types
+                    sets: 3,
+                    reps: 10,
+                    muscle_groups: [], // UI will show defaults
+                  })
+                }}
+                className="w-full bg-primary-container/20 border border-primary-container/40 text-primary-container font-label-caps text-[12px] py-3 rounded-xl hover:bg-primary-container/30 transition-all flex items-center justify-center gap-xs tracking-widest font-bold"
+              >
+                <span className="material-symbols-outlined text-[18px]">add_circle</span>
+                ADD &quot;{suggestedName.toUpperCase()}&quot; TO PLAN
+              </button>
+            )}
           </div>
         )}
 
