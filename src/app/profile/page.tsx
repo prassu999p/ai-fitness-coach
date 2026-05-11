@@ -87,24 +87,24 @@ export default function ProfilePage() {
   return (
     <div className="flex flex-col min-h-screen bg-background">
       {/* Fixed Header */}
-      <header className="fixed top-0 w-full max-w-md z-50 bg-surface/60 backdrop-blur-xl border-b border-white/5 flex justify-between items-center px-margin h-16">
-        <div className="w-8" />
-        <h1 className="font-headline-lg text-headline-lg text-primary uppercase tracking-wider">Profile</h1>
-        <div className="w-8" />
+      <header className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-md z-50 bg-surface/80 backdrop-blur-xl border-b border-white/[0.06]">
+        <div className="flex justify-center items-center px-margin h-14">
+          <h1 className="font-headline-lg text-[20px] text-primary-container uppercase tracking-wider font-bold">Profile</h1>
+        </div>
       </header>
 
-      <main className="flex-grow pt-[88px] pb-[104px] px-margin flex flex-col gap-lg">
+      <main className="flex-grow pt-[72px] pb-[88px] px-margin flex flex-col gap-lg">
         {/* Page Header */}
-        <div>
-          <h2 className="font-display-lg text-display-lg text-primary uppercase">Settings</h2>
-          <p className="font-body-lg text-body-lg text-on-surface-variant mt-xs">
+        <div className="pt-xs">
+          <h2 className="font-headline-lg text-[28px] text-on-surface uppercase">Settings</h2>
+          <p className="font-body-md text-body-md text-on-surface-variant mt-[4px]">
             Customize your training profile
           </p>
         </div>
 
         {/* Fitness Level */}
         <section className="flex flex-col gap-sm">
-          <h3 className="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-widest">
+          <h3 className="font-label-caps text-label-caps text-on-surface-variant/70 uppercase tracking-widest">
             Fitness Level
           </h3>
           <div className="flex flex-col gap-xs">
@@ -112,19 +112,18 @@ export default function ProfilePage() {
               <button
                 key={level.value}
                 onClick={() => setFitnessLevel(level.value)}
-                className={`w-full text-left rounded-xl p-sm border-2 transition-all duration-200 flex items-center justify-between ${
+                className={`w-full text-left rounded-xl p-sm border transition-all duration-200 flex items-center justify-between ${
                   fitnessLevel === level.value
-                    ? 'border-primary-container bg-surface-container glow-primary-active'
-                    : 'border-transparent bg-surface-container-high'
+                    ? 'border-primary-container/40 bg-surface-container'
+                    : 'border-white/[0.06] bg-surface-container hover:border-white/[0.12]'
                 }`}
-                style={{ boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}
               >
                 <div>
-                  <p className="font-headline-md text-headline-md text-primary uppercase">{level.label}</p>
-                  <p className="font-body-md text-body-md text-on-surface-variant">{level.description}</p>
+                  <p className="font-headline-md text-[18px] text-on-surface uppercase">{level.label}</p>
+                  <p className="font-body-md text-[14px] text-on-surface-variant mt-[2px]">{level.description}</p>
                 </div>
                 {fitnessLevel === level.value && (
-                  <span className="material-symbols-outlined text-primary-container" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+                  <span className="material-symbols-outlined text-primary-container text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
                 )}
               </button>
             ))}
@@ -133,7 +132,7 @@ export default function ProfilePage() {
 
         {/* Equipment */}
         <section className="flex flex-col gap-sm">
-          <h3 className="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-widest">
+          <h3 className="font-label-caps text-label-caps text-on-surface-variant/70 uppercase tracking-widest">
             Available Equipment
           </h3>
           <div className="flex flex-wrap gap-xs">
@@ -141,10 +140,10 @@ export default function ProfilePage() {
               <button
                 key={name}
                 onClick={() => toggleEquipment(name)}
-                className={`px-sm py-xs rounded-full text-sm border transition-all duration-200 font-label-caps ${
+                className={`px-sm py-xs rounded-full text-[13px] border transition-all duration-200 font-medium ${
                   equipment.includes(name.toLowerCase())
-                    ? 'border-primary-container bg-primary-container/15 text-primary-container glow-primary'
-                    : 'border-outline-variant bg-surface-container-high text-on-surface-variant'
+                    ? 'border-primary-container/40 bg-primary-container/10 text-primary-container'
+                    : 'border-white/[0.08] bg-surface-container-high text-on-surface-variant hover:border-white/[0.15]'
                 }`}
               >
                 {name}
@@ -155,12 +154,9 @@ export default function ProfilePage() {
 
         {/* AI Model */}
         <section className="flex flex-col gap-sm">
-          <h3 className="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-widest">
+          <h3 className="font-label-caps text-label-caps text-on-surface-variant/70 uppercase tracking-widest">
             AI Model
           </h3>
-          <p className="font-body-md text-body-md text-on-surface-variant text-sm">
-            Requires OPENROUTER_MODEL env var restart to take effect.
-          </p>
           <div className="flex flex-col gap-xs">
             {OPENROUTER_MODELS.map(m => (
               <button
@@ -168,16 +164,16 @@ export default function ProfilePage() {
                 onClick={() => setModel(m.id)}
                 className={`w-full text-left p-sm rounded-xl border transition-all duration-200 flex items-center justify-between ${
                   model === m.id
-                    ? 'border-primary-container/30 bg-surface'
-                    : 'border-white/5 bg-surface hover:border-white/20'
+                    ? 'border-primary-container/30 bg-surface-container'
+                    : 'border-white/[0.06] bg-surface-container hover:border-white/[0.12]'
                 }`}
               >
                 <div>
-                  <p className="font-body-md text-body-md text-primary">{m.label}</p>
-                  <p className="font-data-sm text-data-sm text-on-surface-variant">{m.description}</p>
+                  <p className="font-body-md text-[15px] text-on-surface">{m.label}</p>
+                  <p className="font-mono text-[11px] text-on-surface-variant/60 mt-[2px]">{m.description}</p>
                 </div>
-                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ml-sm ${
-                  model === m.id ? 'border-primary-container' : 'border-outline-variant'
+                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ml-sm transition-colors ${
+                  model === m.id ? 'border-primary-container' : 'border-white/20'
                 }`}>
                   {model === m.id && <div className="w-2.5 h-2.5 rounded-full bg-primary-container" />}
                 </div>
@@ -190,10 +186,10 @@ export default function ProfilePage() {
         <button
           onClick={save}
           disabled={saving}
-          className={`w-full font-label-caps text-label-caps py-sm rounded-xl uppercase tracking-wider transition-all ${
+          className={`w-full font-label-caps text-[14px] py-3.5 rounded-xl uppercase tracking-wider transition-all font-bold ${
             saved
               ? 'bg-primary-container text-on-primary-container'
-              : 'bg-gradient-to-br from-primary-container to-[#8ba800] text-on-primary-container glow-primary hover:opacity-90 disabled:opacity-50'
+              : 'bg-primary-container text-on-primary-container hover:brightness-110 disabled:opacity-50'
           }`}
         >
           {saved ? '✓ SAVED' : saving ? 'SAVING...' : 'SAVE CHANGES'}
@@ -202,12 +198,12 @@ export default function ProfilePage() {
         {/* Sign Out */}
         <button
           onClick={signOut}
-          className="w-full flex items-center gap-sm p-md bg-surface border border-white/5 rounded-xl hover:bg-error-container/20 hover:border-error/30 transition-all group"
+          className="w-full flex items-center gap-sm p-sm bg-surface-container border border-white/[0.06] rounded-xl hover:bg-error-container/10 hover:border-error/20 transition-all group"
         >
-          <div className="w-10 h-10 rounded-lg bg-surface flex items-center justify-center text-error border border-white/5 group-hover:bg-error-container/50 transition-colors">
-            <span className="material-symbols-outlined">logout</span>
+          <div className="w-10 h-10 rounded-lg bg-surface-container-high flex items-center justify-center text-error/70 group-hover:text-error transition-colors">
+            <span className="material-symbols-outlined text-[20px]">logout</span>
           </div>
-          <span className="font-headline-md text-[20px] text-error">Logout</span>
+          <span className="font-body-md text-[16px] text-on-surface-variant group-hover:text-error transition-colors">Sign Out</span>
         </button>
       </main>
 

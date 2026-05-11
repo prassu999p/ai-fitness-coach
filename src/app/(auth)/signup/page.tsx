@@ -31,25 +31,28 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="flex flex-col min-h-screen px-margin py-xl relative">
+    <div className="flex flex-col min-h-screen px-margin relative">
       {/* Ambient glow */}
-      <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(circle at 50% 0%, rgba(195, 244, 0, 0.04) 0%, transparent 60%)' }} />
+      <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(circle at 50% 20%, rgba(195, 244, 0, 0.04) 0%, transparent 60%)' }} />
 
-      <div className="flex-1 flex flex-col justify-center">
+      <div className="flex-1 flex flex-col justify-center relative">
         {/* Brand */}
         <div className="mb-xl text-center">
-          <h1 className="font-headline-lg text-headline-lg text-primary uppercase tracking-wider mb-xs">
+          <div className="w-16 h-16 rounded-2xl bg-primary-container/10 border border-primary-container/20 flex items-center justify-center mx-auto mb-md">
+            <span className="material-symbols-outlined text-primary-container text-[32px]" style={{ fontVariationSettings: "'FILL' 1" }}>fitness_center</span>
+          </div>
+          <h1 className="font-headline-lg text-[28px] text-on-surface uppercase tracking-wider mb-xs font-bold">
             Join Elite
           </h1>
-          <p className="font-body-md text-body-md text-on-surface-variant">
+          <p className="font-body-md text-[15px] text-on-surface-variant">
             Start your AI training journey
           </p>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSignup} className="space-y-md">
-          <div className="space-y-xs">
-            <label className="font-label-caps text-label-caps text-on-surface-variant uppercase block">
+        <form onSubmit={handleSignup} className="flex flex-col gap-md">
+          <div className="flex flex-col gap-xs">
+            <label className="font-label-caps text-[11px] text-on-surface-variant/70 uppercase tracking-widest block">
               Email
             </label>
             <input
@@ -58,12 +61,12 @@ export default function SignupPage() {
               value={email}
               onChange={e => setEmail(e.target.value)}
               required
-              className="w-full bg-surface-container-high text-on-surface placeholder-on-surface-variant/50 rounded-lg px-sm py-sm border-b-2 border-outline-variant focus:border-primary-container outline-none transition-colors font-body-md text-body-md"
+              className="w-full bg-surface-container text-on-surface placeholder-on-surface-variant/30 rounded-xl px-sm py-sm border border-white/[0.08] focus:border-primary-container/50 outline-none transition-colors font-body-md text-[15px]"
             />
           </div>
 
-          <div className="space-y-xs">
-            <label className="font-label-caps text-label-caps text-on-surface-variant uppercase block">
+          <div className="flex flex-col gap-xs">
+            <label className="font-label-caps text-[11px] text-on-surface-variant/70 uppercase tracking-widest block">
               Password
             </label>
             <input
@@ -73,24 +76,26 @@ export default function SignupPage() {
               onChange={e => setPassword(e.target.value)}
               required
               minLength={6}
-              className="w-full bg-surface-container-high text-on-surface placeholder-on-surface-variant/50 rounded-lg px-sm py-sm border-b-2 border-outline-variant focus:border-primary-container outline-none transition-colors font-body-md text-body-md"
+              className="w-full bg-surface-container text-on-surface placeholder-on-surface-variant/30 rounded-xl px-sm py-sm border border-white/[0.08] focus:border-primary-container/50 outline-none transition-colors font-body-md text-[15px]"
             />
           </div>
 
           {error && (
-            <p className="text-error text-sm font-body-md">{error}</p>
+            <div className="bg-error-container/10 border border-error/20 rounded-xl px-sm py-xs">
+              <p className="text-error text-[14px] font-body-md">{error}</p>
+            </div>
           )}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-gradient-to-br from-primary-container to-[#8ba800] text-on-primary-container font-label-caps text-label-caps py-sm rounded-xl uppercase tracking-wider glow-primary hover:opacity-90 disabled:opacity-50 transition-all mt-sm"
+            className="w-full bg-primary-container text-on-primary-container font-label-caps text-[14px] py-3.5 rounded-xl uppercase tracking-wider hover:brightness-110 disabled:opacity-50 transition-all mt-xs font-bold"
           >
             {loading ? 'Creating account...' : 'Create Account'}
           </button>
         </form>
 
-        <p className="mt-lg text-center font-body-md text-body-md text-on-surface-variant">
+        <p className="mt-lg text-center font-body-md text-[14px] text-on-surface-variant">
           Already training?{' '}
           <Link href="/login" className="text-primary-container hover:opacity-80 transition-opacity font-semibold">
             Sign In

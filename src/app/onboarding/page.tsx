@@ -70,31 +70,33 @@ export default function OnboardingPage() {
   return (
     <div className="flex flex-col min-h-screen">
       {/* Fixed Header */}
-      <header className="bg-surface/60 backdrop-blur-xl border-b border-white/5 fixed top-0 w-full max-w-md z-50 flex items-center justify-between px-margin h-16">
-        {step > 1 ? (
-          <button
-            onClick={() => setStep((step - 1) as Step)}
-            className="text-primary hover:opacity-80 transition-opacity"
-          >
-            <span className="material-symbols-outlined text-3xl">arrow_back</span>
-          </button>
-        ) : (
+      <header className="bg-surface/80 backdrop-blur-xl border-b border-white/[0.06] fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-md z-50">
+        <div className="flex items-center justify-between px-margin h-14">
+          {step > 1 ? (
+            <button
+              onClick={() => setStep((step - 1) as Step)}
+              className="text-on-surface-variant hover:text-primary-container transition-colors p-1 -ml-1"
+            >
+              <span className="material-symbols-outlined text-[22px]">arrow_back</span>
+            </button>
+          ) : (
+            <div className="w-8" />
+          )}
+          <h1 className="font-headline-lg text-[20px] text-primary-container uppercase tracking-wider font-bold">
+            Elite Athlete
+          </h1>
           <div className="w-8" />
-        )}
-        <h1 className="font-headline-lg text-headline-lg text-primary uppercase tracking-wider">
-          Elite Athlete
-        </h1>
-        <div className="w-8" />
+        </div>
       </header>
 
       {/* Main Content */}
-      <main className="flex-grow pt-[88px] pb-[104px] px-margin flex flex-col">
+      <main className="flex-grow pt-[72px] pb-[88px] px-margin flex flex-col">
         {/* Progress Bar */}
-        <div className="flex gap-xs mb-lg mt-md">
+        <div className="flex gap-xs mb-lg mt-sm">
           {progressSegments.map((active, i) => (
             <div
               key={i}
-              className={`h-1 flex-1 rounded-full transition-all duration-300 ${active ? 'bg-primary-container glow-primary' : 'bg-surface-container-high'}`}
+              className={`h-1 flex-1 rounded-full transition-all duration-300 ${active ? 'bg-primary-container' : 'bg-surface-container-high'}`}
             />
           ))}
         </div>
@@ -103,28 +105,28 @@ export default function OnboardingPage() {
         {step === 1 && (
           <div className="flex flex-col flex-grow">
             <div className="mb-lg">
-              <p className="font-label-caps text-label-caps text-on-surface-variant uppercase mb-xs">Step 1 of 3</p>
-              <h2 className="font-display-lg text-display-lg text-primary uppercase">Select Your Level</h2>
-              <p className="font-body-lg text-body-lg text-on-surface-variant mt-xs">
+              <p className="font-label-caps text-[11px] text-on-surface-variant/60 uppercase mb-xs tracking-widest">Step 1 of 3</p>
+              <h2 className="font-headline-lg text-[28px] text-on-surface uppercase">Select Your Level</h2>
+              <p className="font-body-md text-[15px] text-on-surface-variant mt-xs">
                 Calibrate the engine. This determines your initial volume and intensity.
               </p>
             </div>
-            <div className="flex flex-col gap-md flex-grow">
+            <div className="flex flex-col gap-xs flex-grow">
               {FITNESS_LEVELS.map(level => (
                 <button
                   key={level.value}
                   onClick={() => setFitnessLevel(level.value)}
-                  className={`w-full text-left rounded-xl p-md border-2 inner-glow transition-all duration-200 flex items-center justify-between ${
+                  className={`w-full text-left rounded-xl p-sm border transition-all duration-200 flex items-center justify-between ${
                     fitnessLevel === level.value
-                      ? 'border-primary-container bg-surface-container glow-primary-active'
-                      : 'border-transparent bg-surface-container-high'
+                      ? 'border-primary-container/40 bg-surface-container'
+                      : 'border-white/[0.06] bg-surface-container hover:border-white/[0.12]'
                   }`}
                 >
                   <div className="flex-1">
-                    <h3 className="font-headline-md text-headline-md text-primary uppercase mb-base">{level.label}</h3>
-                    <p className="font-body-md text-body-md text-on-surface-variant">{level.description}</p>
+                    <h3 className="font-headline-md text-[18px] text-on-surface uppercase mb-[2px]">{level.label}</h3>
+                    <p className="font-body-md text-[14px] text-on-surface-variant">{level.description}</p>
                   </div>
-                  <span className={`material-symbols-outlined text-4xl ml-sm transition-colors ${fitnessLevel === level.value ? 'text-primary-container' : 'text-on-surface-variant'}`}>
+                  <span className={`material-symbols-outlined text-[28px] ml-sm transition-colors ${fitnessLevel === level.value ? 'text-primary-container' : 'text-on-surface-variant/30'}`}>
                     {level.icon}
                   </span>
                 </button>
@@ -137,27 +139,27 @@ export default function OnboardingPage() {
         {step === 2 && (
           <div className="flex flex-col flex-grow">
             <div className="mb-lg">
-              <p className="font-label-caps text-label-caps text-on-surface-variant uppercase mb-xs">Step 2 of 3</p>
-              <h2 className="font-display-lg text-display-lg text-primary uppercase">Training Frequency</h2>
-              <p className="font-body-lg text-body-lg text-on-surface-variant mt-xs">
+              <p className="font-label-caps text-[11px] text-on-surface-variant/60 uppercase mb-xs tracking-widest">Step 2 of 3</p>
+              <h2 className="font-headline-lg text-[28px] text-on-surface uppercase">Training Frequency</h2>
+              <p className="font-body-md text-[15px] text-on-surface-variant mt-xs">
                 How many sessions per week can you commit to?
               </p>
             </div>
-            <div className="grid grid-cols-2 gap-md flex-grow">
+            <div className="grid grid-cols-2 gap-sm flex-grow content-start">
               {[3, 4, 5, 6].map(n => (
                 <button
                   key={n}
                   onClick={() => setDaysPerWeek(n)}
-                  className={`rounded-xl border-2 inner-glow transition-all duration-200 flex flex-col items-center justify-center py-lg ${
+                  className={`rounded-xl border transition-all duration-200 flex flex-col items-center justify-center py-lg ${
                     daysPerWeek === n
-                      ? 'border-primary-container bg-surface-container glow-primary-active'
-                      : 'border-transparent bg-surface-container-high'
+                      ? 'border-primary-container/40 bg-surface-container'
+                      : 'border-white/[0.06] bg-surface-container hover:border-white/[0.12]'
                   }`}
                 >
-                  <span className={`font-display-lg text-display-lg font-mono transition-colors ${daysPerWeek === n ? 'text-primary-container' : 'text-primary'}`}>
+                  <span className={`font-mono text-[40px] font-bold transition-colors leading-none ${daysPerWeek === n ? 'text-primary-container' : 'text-on-surface'}`}>
                     {n}
                   </span>
-                  <span className="font-label-caps text-label-caps text-on-surface-variant uppercase mt-xs">
+                  <span className="font-label-caps text-[11px] text-on-surface-variant uppercase mt-xs tracking-widest">
                     {n === 1 ? 'day' : 'days'} / week
                   </span>
                 </button>
@@ -170,9 +172,9 @@ export default function OnboardingPage() {
         {step === 3 && (
           <div className="flex flex-col flex-grow">
             <div className="mb-md">
-              <p className="font-label-caps text-label-caps text-on-surface-variant uppercase mb-xs">Step 3 of 3</p>
-              <h2 className="font-display-lg text-display-lg text-primary uppercase">Your Arsenal</h2>
-              <p className="font-body-lg text-body-lg text-on-surface-variant mt-xs">
+              <p className="font-label-caps text-[11px] text-on-surface-variant/60 uppercase mb-xs tracking-widest">Step 3 of 3</p>
+              <h2 className="font-headline-lg text-[28px] text-on-surface uppercase">Your Arsenal</h2>
+              <p className="font-body-md text-[15px] text-on-surface-variant mt-xs">
                 Select everything available at your gym.
               </p>
             </div>
@@ -181,10 +183,10 @@ export default function OnboardingPage() {
                 <button
                   key={eq.name}
                   onClick={() => toggleEquipment(eq.name)}
-                  className={`px-sm py-xs rounded-full text-sm border transition-all duration-200 font-body-md ${
+                  className={`px-sm py-xs rounded-full text-[13px] border transition-all duration-200 font-medium ${
                     selectedEquipment.includes(eq.name)
-                      ? 'border-primary-container bg-primary-container/15 text-primary-container glow-primary'
-                      : 'border-outline-variant bg-surface-container-high text-on-surface-variant'
+                      ? 'border-primary-container/40 bg-primary-container/10 text-primary-container'
+                      : 'border-white/[0.08] bg-surface-container-high text-on-surface-variant hover:border-white/[0.15]'
                   }`}
                 >
                   {eq.icon} {eq.name}
@@ -196,12 +198,12 @@ export default function OnboardingPage() {
       </main>
 
       {/* Fixed Bottom Action Bar */}
-      <div className="fixed bottom-0 left-0 w-full max-w-md bg-surface/90 backdrop-blur-md p-margin border-t border-white/5 z-40 mx-auto">
+      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-surface/90 backdrop-blur-md p-margin border-t border-white/[0.06] z-40">
         <div className="flex justify-between items-center">
           {step > 1 ? (
             <button
               onClick={() => setStep((step - 1) as Step)}
-              className="font-label-caps text-label-caps text-on-surface-variant hover:text-primary py-xs px-sm uppercase transition-colors"
+              className="font-label-caps text-[12px] text-on-surface-variant hover:text-primary-container py-xs px-sm uppercase transition-colors tracking-wider"
             >
               Back
             </button>
@@ -212,7 +214,7 @@ export default function OnboardingPage() {
           {step < 3 ? (
             <button
               onClick={() => setStep((step + 1) as Step)}
-              className="bg-gradient-to-br from-primary-container to-[#8ba800] text-on-primary-container font-label-caps text-label-caps py-sm px-lg rounded-xl uppercase tracking-wider glow-primary hover:opacity-90 transition-opacity flex items-center gap-xs"
+              className="bg-primary-container text-on-primary-container font-label-caps text-[14px] py-sm px-lg rounded-xl uppercase tracking-wider hover:brightness-110 transition-all flex items-center gap-xs font-bold"
             >
               Next Step
               <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
@@ -221,7 +223,7 @@ export default function OnboardingPage() {
             <button
               onClick={handleFinish}
               disabled={saving}
-              className="bg-gradient-to-br from-primary-container to-[#8ba800] text-on-primary-container font-label-caps text-label-caps py-sm px-lg rounded-xl uppercase tracking-wider glow-primary hover:opacity-90 disabled:opacity-50 transition-all flex items-center gap-xs"
+              className="bg-primary-container text-on-primary-container font-label-caps text-[14px] py-sm px-lg rounded-xl uppercase tracking-wider hover:brightness-110 disabled:opacity-50 transition-all flex items-center gap-xs font-bold"
             >
               {saving ? 'Setting up...' : "Let's Train"}
               {!saving && <span className="material-symbols-outlined text-[18px]">bolt</span>}
