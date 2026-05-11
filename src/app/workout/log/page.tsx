@@ -2,11 +2,11 @@
 
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { ExerciseLogger } from '@/components/ExerciseLogger'
+import { ExerciseLogger, type CompletedExercise } from '@/components/ExerciseLogger'
 import { BottomNav } from '@/components/BottomNav'
 import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
-import type { WorkoutExercise, SuggestedExercise } from '@/lib/types'
+import type { SuggestedExercise } from '@/lib/types'
 
 const COMMON_EXERCISES: SuggestedExercise[] = [
   { name: 'Bench Press', type: 'strength', sets: 4, reps: 8, weight_kg: 60, muscle_groups: ['chest'] },
@@ -26,7 +26,7 @@ export default function PostWorkoutLogPage() {
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [selectedExercise, setSelectedExercise] = useState<SuggestedExercise>(COMMON_EXERCISES[0])
   const [customName, setCustomName] = useState('')
-  const [logged, setLogged] = useState<Omit<WorkoutExercise, 'id' | 'workout_id'>[]>([])
+  const [logged, setLogged] = useState<CompletedExercise[]>([])
   const [saving, setSaving] = useState(false)
   const router = useRouter()
   const supabase = createClient()
@@ -35,8 +35,8 @@ export default function PostWorkoutLogPage() {
     ? { ...selectedExercise, name: customName }
     : selectedExercise
 
-  function handleLog(entry: Omit<WorkoutExercise, 'id' | 'workout_id'>) {
-    setLogged(prev => [...prev, entry])
+  function handleComplete(entry: CompletedExercise) {
+    setLogged(prev => [...prev, { ...entry, exercise: { ...entry.exercise, sort_order: prev.length } }])
   }
 
   async function saveWorkout() {
@@ -53,9 +53,25 @@ export default function PostWorkoutLogPage() {
       .single()
 
     if (workoutRow) {
-      await supabase.from('workout_exercises').insert(
-        logged.map(ex => ({ ...ex, workout_id: workoutRow.id }))
-      )
+      const { data: insertedExercises } = await supabase
+        .from('workout_exercises')
+        .insert(logged.map(l => ({ ...l.exercise, workout_id: workoutRow.id })))
+        .select()
+
+      if (insertedExercises) {
+        const setRows = insertedExercises.flatMap((ex, i) =>
+          logged[i].sets.map(s => ({
+            workout_exercise_id: ex.id,
+            set_number: s.set_number,
+            weight_kg: s.weight_kg,
+            reps: s.reps,
+            perceived_effort: s.perceived_effort,
+          })),
+        )
+        if (setRows.length > 0) {
+          await supabase.from('workout_sets').insert(setRows)
+        }
+      }
     }
 
     router.push('/dashboard')
@@ -124,7 +140,7 @@ export default function PostWorkoutLogPage() {
         </div>
 
         {/* Exercise Logger */}
-        <ExerciseLogger exercise={activeExercise} onLog={handleLog} sortOrder={logged.length} />
+        <ExerciseLogger exercise={activeExercise} onComplete={handleComplete} sortOrder={logged.length} />
 
         {/* Logged exercises */}
         {logged.length > 0 && (
@@ -132,13 +148,13 @@ export default function PostWorkoutLogPage() {
             <p className="font-label-caps text-label-caps text-on-surface-variant/70 uppercase tracking-widest">
               Logged ({logged.length})
             </p>
-            {logged.map((ex, i) => (
+            {logged.map((entry, i) => (
               <div key={i} className="bg-surface-container rounded-xl px-sm py-xs flex items-center justify-between border border-white/[0.06]">
-                <span className="font-body-md text-[15px] text-on-surface">{ex.exercise_name}</span>
+                <span className="font-body-md text-[15px] text-on-surface">{entry.exercise.exercise_name}</span>
                 <span className="font-mono text-[12px] text-primary-container">
-                  {ex.exercise_type === 'strength'
-                    ? `${ex.sets}×${ex.reps} @ ${ex.weight_kg}kg`
-                    : `${ex.duration_minutes}min`}
+                  {entry.exercise.exercise_type === 'strength'
+                    ? `${entry.sets.length} sets`
+                    : `${entry.exercise.duration_minutes}min`}
                 </span>
               </div>
             ))}
