@@ -5,6 +5,8 @@ import { agentModel } from '@/lib/agent/client'
 import { createAgentTools } from '@/lib/agent/tools'
 import { format } from 'date-fns'
 
+export const maxDuration = 60
+
 const PREVIEW_SYSTEM = `You are an expert strength coach. The user wants a new training program.
 1. Call get_user_profile and get_workout_history({ days: 60 }) in parallel (this returns a PerformanceSummary, not raw data — use it to gauge current capacity)
 2. Design a full periodized block: 2–3 named phases, week-by-week exercise prescription
@@ -31,16 +33,25 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const body = await req.json() as {
+  let body: {
     action?: 'generate' | 'confirm' | 'revise'
     feedback?: string
     draftProgram?: object
     goal?: string
     durationWeeks?: number
   }
+  try {
+    body = await req.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
+  }
 
   const action = body.action ?? 'generate'
   const tools = createAgentTools(supabase, user.id)
+
+  const goal = typeof body.goal === 'string' ? body.goal.slice(0, 100) : 'hypertrophy'
+  const feedback = typeof body.feedback === 'string' ? body.feedback.slice(0, 1000) : undefined
+  const durationWeeks = typeof body.durationWeeks === 'number' ? Math.min(Math.max(body.durationWeeks, 4), 16) : 8
 
   if (action === 'generate' || action === 'revise') {
     const controller = new AbortController()
@@ -49,8 +60,8 @@ export async function POST(req: NextRequest) {
     try {
       const { text } = await generateText({
         model: agentModel,
-        system: PREVIEW_SYSTEM + `\nToday: ${format(new Date(), 'yyyy-MM-dd')}. Goal: ${body.goal ?? 'hypertrophy'}. Duration: ${body.durationWeeks ?? 8} weeks.${body.feedback ? `\nUser feedback on previous draft: ${body.feedback}` : ''}`,
-        messages: [{ role: 'user', content: body.feedback ? `Revise the program based on my feedback: ${body.feedback}` : 'Generate my program now.' }],
+        system: PREVIEW_SYSTEM + `\nToday: ${format(new Date(), 'yyyy-MM-dd')}. Goal: ${goal}. Duration: ${durationWeeks} weeks.${feedback ? `\nUser feedback on previous draft: ${feedback}` : ''}`,
+        messages: [{ role: 'user', content: feedback ? `Revise the program based on my feedback: ${feedback}` : 'Generate my program now.' }],
         tools: { get_user_profile: tools.get_user_profile, get_workout_history: tools.get_workout_history },
         stopWhen: stepCountIs(3),
         abortSignal: controller.signal,
@@ -66,7 +77,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ preview: parsed.preview, draftProgram: parsed.program })
     } catch (error) {
       clearTimeout(timeout)
-      return NextResponse.json({ error: 'timeout' }, { status: 504 })
+      if (error instanceof Error && error.name === 'AbortError') {
+        return NextResponse.json({ error: 'Request timed out. Please try again.' }, { status: 504 })
+      }
+      console.error('[generate-program] generateText failed:', error)
+      return NextResponse.json({ error: 'Failed to generate program. Please try again.' }, { status: 500 })
     }
   }
 
@@ -82,7 +97,7 @@ export async function POST(req: NextRequest) {
       system: COMMIT_SYSTEM,
       messages: [{
         role: 'user',
-        content: `Commit this program to the database:\n\`\`\`json\n${JSON.stringify(body.draftProgram)}\`\`\`${body.feedback ? `\n\nUser asked to change: ${body.feedback}` : ''}`,
+        content: `Commit this program to the database:\n\`\`\`json\n${JSON.stringify(body.draftProgram)}\`\`\`${feedback ? `\n\nUser asked to change: ${feedback}` : ''}`,
       }],
       tools,
       stopWhen: stepCountIs(6),
@@ -92,6 +107,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true })
   } catch (error) {
     clearTimeout(timeout)
-    return NextResponse.json({ error: 'timeout' }, { status: 504 })
+    if (error instanceof Error && error.name === 'AbortError') {
+      return NextResponse.json({ error: 'Request timed out. Please try again.' }, { status: 504 })
+    }
+    console.error('[generate-program] generateText failed:', error)
+    return NextResponse.json({ error: 'Failed to generate program. Please try again.' }, { status: 500 })
   }
 }
