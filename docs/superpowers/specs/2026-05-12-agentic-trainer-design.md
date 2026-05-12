@@ -216,7 +216,7 @@ Max tool call rounds: 6. Response: streamed.
 
 **`POST /api/trainer/review-week`**
 
-Trigger: Dashboard load on the first day of a new training week (client checks: is `program_weeks.status === 'active'` for the just-ended week?). Debounced — only runs once per week.
+Trigger: Dashboard load on the first day of a new training week. Client checks: does the `program_weeks` row for the just-ended week have `status = 'active'` and `reviewed_at IS NULL`? If yes, fire the review. The server sets `reviewed_at = now()` at the start of the review run, so concurrent dashboard loads do not double-trigger it.
 
 Agent steps:
 1. `get_current_program` + `get_workout_history({ days: 7 })`
@@ -266,7 +266,7 @@ Removals:
 
 Bug fix — Start Workout button:
 - Remove reliance on stale `suggestion` React state.
-- On click: call `GET /api/suggest-workout/today` server-side to get the freshest session, then insert workout record with that as `suggestion_snapshot`.
+- On click: call the existing `POST /api/suggest-workout` to get the freshest session server-side (cache hit is fast), then insert the workout record with that response as `suggestion_snapshot`.
 - Add `visibilitychange` event listener to re-run `loadSuggestion()` when tab becomes active after being backgrounded.
 
 ### New: Trainer Tab (`/trainer`)
