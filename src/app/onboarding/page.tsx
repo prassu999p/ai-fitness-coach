@@ -46,8 +46,7 @@ export default function OnboardingPage() {
       )
     }
 
-    router.push('/dashboard')
-    router.refresh()
+    router.push('/onboarding/goals')
   }
 
   const progressSegments = [step >= 1, step >= 2, step >= 3]
