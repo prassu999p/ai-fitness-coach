@@ -96,3 +96,74 @@ export interface WeeklyPlan {
   day_slots: Record<DayKey, DayFocus>
   model_used: string
 }
+
+export type PrimaryGoal = 'hypertrophy' | 'strength' | 'fat_loss' | 'endurance' | 'general_fitness'
+
+export interface TrainingProgram {
+  id: string
+  user_id: string
+  goal: PrimaryGoal
+  duration_weeks: number
+  start_date: string
+  end_date: string
+  status: 'active' | 'completed' | 'paused'
+  phases: ProgramPhase[]
+  week_plan: WeekPlan
+  model_used: string | null
+  created_at: string
+}
+
+export interface ProgramPhase {
+  name: string
+  week_range: [number, number]
+  focus: string
+  intensity: string
+}
+
+export type WeekPlan = Record<string, Record<string, DaySlot>>
+
+export interface DaySlot {
+  focus: string
+  exercises?: PrescribedExercise[]
+}
+
+export interface PrescribedExercise {
+  name: string
+  sets: number
+  reps: number
+  weight_kg?: number
+}
+
+export interface ProgramWeek {
+  id: string
+  program_id: string
+  user_id: string
+  week_number: number
+  week_start: string
+  prescribed: WeekPlan | null
+  actual: Record<string, unknown> | null
+  adjustment_notes: string | null
+  status: 'upcoming' | 'active' | 'reviewing' | 'completed' | 'adjusted'
+  reviewed_at: string | null
+  updated_at: string
+}
+
+export interface TrainerMessage {
+  id: string
+  user_id: string
+  role: 'trainer' | 'user'
+  content: string
+  message_type: 'chat' | 'check_in' | 'program_adjustment' | 'session_feedback' | 'weekly_review'
+  metadata: Record<string, unknown> | null
+  read_at: string | null
+  created_at: string
+}
+
+// Returned by get_workout_history when days > 14 (context-efficient summary)
+export interface PerformanceSummary {
+  exercise_name: string
+  estimated_1rm_trend_kg: number | null
+  weekly_volume_trend: 'increasing' | 'stable' | 'decreasing'
+  last_rpe: number | null
+  sessions_count: number
+}
