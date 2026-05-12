@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import type { SuggestedExercise, WorkoutExercise, WorkoutSetInput } from '@/lib/types'
+import { RpeSelector } from '@/components/RpeSelector'
 
 export interface CompletedExercise {
   exercise: Omit<WorkoutExercise, 'id' | 'workout_id'>
@@ -17,7 +18,7 @@ interface Props {
 interface SetRowState {
   weight: string
   reps: string
-  effort: number
+  effort: number | null
 }
 
 export function ExerciseLogger({ exercise, onComplete, sortOrder = 0 }: Props) {
@@ -27,11 +28,11 @@ export function ExerciseLogger({ exercise, onComplete, sortOrder = 0 }: Props) {
     Array.from({ length: initialSetCount }, () => ({
       weight: exercise.weight_kg?.toString() ?? '',
       reps: exercise.reps?.toString() ?? '',
-      effort: 3,
+      effort: null,
     })),
   )
   const [duration, setDuration] = useState(exercise.duration_minutes?.toString() ?? '')
-  const [cardioEffort, setCardioEffort] = useState(3)
+  const [cardioEffort, setCardioEffort] = useState<number | null>(null)
 
   function updateRow(index: number, patch: Partial<SetRowState>) {
     setRows(prev => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)))
@@ -40,7 +41,7 @@ export function ExerciseLogger({ exercise, onComplete, sortOrder = 0 }: Props) {
   function addRow() {
     setRows(prev => {
       const last = prev[prev.length - 1]
-      return [...prev, last ? { ...last } : { weight: '', reps: '', effort: 3 }]
+      return [...prev, last ? { ...last } : { weight: '', reps: '', effort: null }]
     })
   }
 
@@ -54,9 +55,9 @@ export function ExerciseLogger({ exercise, onComplete, sortOrder = 0 }: Props) {
         set_number: i + 1,
         weight_kg: row.weight ? parseFloat(row.weight) : null,
         reps: row.reps ? parseInt(row.reps) : null,
-        perceived_effort: row.effort,
+        perceived_effort: row.effort ?? 5,
       }))
-      const avgEffort = Math.round(sets.reduce((s, r) => s + (r.perceived_effort ?? 3), 0) / sets.length)
+      const avgEffort = Math.round(sets.reduce((s, r) => s + (r.perceived_effort ?? 5), 0) / sets.length)
       onComplete({
         exercise: {
           exercise_name: exercise.name,
@@ -80,10 +81,10 @@ export function ExerciseLogger({ exercise, onComplete, sortOrder = 0 }: Props) {
           reps: null,
           weight_kg: null,
           duration_minutes: dur,
-          perceived_effort: cardioEffort,
+          perceived_effort: cardioEffort ?? 5,
           sort_order: sortOrder,
         },
-        sets: [{ set_number: 1, weight_kg: null, reps: null, perceived_effort: cardioEffort }],
+        sets: [{ set_number: 1, weight_kg: null, reps: null, perceived_effort: cardioEffort ?? 5 }],
       })
     }
   }
@@ -107,23 +108,11 @@ export function ExerciseLogger({ exercise, onComplete, sortOrder = 0 }: Props) {
 
       {exercise.type === 'strength' ? (
         <div className="flex flex-col gap-xs">
-          <div className="grid grid-cols-12 gap-2 pb-[6px] border-b border-white/[0.06] font-label-caps text-[10px] text-on-surface-variant/50 text-center tracking-widest">
-            <div className="col-span-1 text-left">#</div>
-            <div className="col-span-3">KG</div>
-            <div className="col-span-3">REPS</div>
-            <div className="col-span-4">EFFORT</div>
-            <div className="col-span-1"></div>
-          </div>
-
           {rows.map((row, i) => (
-            <div
-              key={i}
-              data-testid="set-row"
-              className="grid grid-cols-12 gap-2 items-center bg-surface-container-high px-2 py-3 rounded-lg border border-white/[0.08] relative overflow-hidden"
-            >
+            <div key={i} data-testid="set-row" className="bg-surface-container-high px-3 py-2 rounded-lg border border-white/[0.08] relative overflow-hidden flex flex-col gap-2">
               <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-primary-container rounded-l-lg" />
-              <div className="col-span-1 text-center font-mono text-[12px] text-on-surface-variant">{i + 1}</div>
-              <div className="col-span-3">
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-[12px] text-on-surface-variant w-5 text-center">{i + 1}</span>
                 <input
                   data-testid="set-weight"
                   type="number"
@@ -131,42 +120,27 @@ export function ExerciseLogger({ exercise, onComplete, sortOrder = 0 }: Props) {
                   placeholder="0"
                   value={row.weight}
                   onChange={e => updateRow(i, { weight: e.target.value })}
-                  className="w-full bg-surface-container text-center font-mono text-on-surface py-1.5 rounded-lg border border-white/[0.08] focus:border-primary-container/50 outline-none text-[14px] transition-colors"
+                  className="w-20 bg-surface-container text-center font-mono text-on-surface py-1.5 rounded-lg border border-white/[0.08] focus:border-primary-container/50 outline-none text-[14px] transition-colors"
                 />
-              </div>
-              <div className="col-span-3">
+                <span className="text-xs text-on-surface-variant/50 font-mono">kg</span>
                 <input
                   data-testid="set-reps"
                   type="number"
                   placeholder="0"
                   value={row.reps}
                   onChange={e => updateRow(i, { reps: e.target.value })}
-                  className="w-full bg-surface-container text-center font-mono text-on-surface py-1.5 rounded-lg border border-white/[0.08] focus:border-primary-container/50 outline-none text-[14px] transition-colors"
+                  className="w-16 bg-surface-container text-center font-mono text-on-surface py-1.5 rounded-lg border border-white/[0.08] focus:border-primary-container/50 outline-none text-[14px] transition-colors"
                 />
+                <span className="text-xs text-on-surface-variant/50 font-mono">reps</span>
+                <div className="ml-auto">
+                  {rows.length > 1 && (
+                    <button onClick={() => removeRow(i)} className="text-on-surface-variant/60 hover:text-error transition-colors" aria-label="Remove set">
+                      <span className="material-symbols-outlined text-[16px]">close</span>
+                    </button>
+                  )}
+                </div>
               </div>
-              <div className="col-span-4 flex items-center gap-1">
-                <input
-                  data-testid="set-effort"
-                  type="range"
-                  min={1}
-                  max={5}
-                  value={row.effort}
-                  onChange={e => updateRow(i, { effort: parseInt(e.target.value) })}
-                  className="w-full accent-[#c3f400]"
-                />
-                <span className="font-mono text-[11px] text-primary-container w-6 text-right">{row.effort}</span>
-              </div>
-              <div className="col-span-1 flex justify-end">
-                {rows.length > 1 && (
-                  <button
-                    onClick={() => removeRow(i)}
-                    className="text-on-surface-variant/60 hover:text-error transition-colors"
-                    aria-label="Remove set"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">close</span>
-                  </button>
-                )}
-              </div>
+              <RpeSelector value={row.effort} onChange={val => updateRow(i, { effort: val })} />
             </div>
           ))}
 
@@ -190,20 +164,7 @@ export function ExerciseLogger({ exercise, onComplete, sortOrder = 0 }: Props) {
             />
           </div>
 
-          <div className="flex flex-col gap-xs">
-            <div className="flex items-center justify-between font-mono text-[11px] text-on-surface-variant/60">
-              <span>EFFORT</span>
-              <span className="text-primary-container">{cardioEffort}/5</span>
-            </div>
-            <input
-              type="range"
-              min={1}
-              max={5}
-              value={cardioEffort}
-              onChange={e => setCardioEffort(parseInt(e.target.value))}
-              className="w-full accent-[#c3f400]"
-            />
-          </div>
+          <RpeSelector value={cardioEffort} onChange={setCardioEffort} />
         </div>
       )}
 
