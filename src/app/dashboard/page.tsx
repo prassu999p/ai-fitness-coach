@@ -9,6 +9,8 @@ import { format, startOfWeek, endOfWeek, addDays } from 'date-fns'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { Workout, SuggestedWorkout, WeeklyPlan, DayFocus, DayKey } from '@/lib/types'
+import { CoachingCard } from '@/components/CoachingCard'
+import type { TrainerMessage } from '@/lib/types'
 
 function getGreeting() {
   const h = new Date().getHours()
@@ -57,6 +59,7 @@ export default function DashboardPage() {
   const [planExpanded, setPlanExpanded] = useState(false)
   const [startingWorkout, setStartingWorkout] = useState(false)
   const [isPrescribed, setIsPrescribed] = useState(false)
+  const [coachingCards, setCoachingCards] = useState<TrainerMessage[]>([])
   const [lastLoadDate, setLastLoadDate] = useState(() =>
     new Date().toLocaleDateString('en-CA', { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone })
   )
@@ -90,6 +93,14 @@ export default function DashboardPage() {
     await fetch('/api/regenerate-weekly-plan', { method: 'POST' })
     await loadSuggestion()
     setRegenerating(false)
+  }
+
+  async function dismissCard(id: string) {
+    setCoachingCards(prev => prev.filter(c => c.id !== id))
+    await supabase
+      .from('trainer_messages')
+      .update({ read_at: new Date().toISOString() })
+      .eq('id', id)
   }
 
   useEffect(() => {
@@ -148,6 +159,16 @@ export default function DashboardPage() {
       setStreak(s)
 
       try { await loadSuggestion() } catch {}
+
+      const { data: cards } = await supabase
+        .from('trainer_messages')
+        .select('*')
+        .eq('user_id', user.id)
+        .in('message_type', ['check_in', 'weekly_review', 'program_adjustment'])
+        .is('read_at', null)
+        .order('created_at', { ascending: false })
+        .limit(3)
+      setCoachingCards(cards ?? [])
 
       setLoading(false)
     }
@@ -314,6 +335,14 @@ export default function DashboardPage() {
                 </div>
               </div>
             </div>
+          </section>
+        )}
+
+        {coachingCards.length > 0 && (
+          <section aria-label="Coaching Messages" className="flex flex-col gap-xs">
+            {coachingCards.map(card => (
+              <CoachingCard key={card.id} message={card} onDismiss={dismissCard} />
+            ))}
           </section>
         )}
 
