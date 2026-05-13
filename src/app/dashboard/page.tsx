@@ -56,6 +56,7 @@ export default function DashboardPage() {
   const [regenerating, setRegenerating] = useState(false)
   const [planExpanded, setPlanExpanded] = useState(false)
   const [startingWorkout, setStartingWorkout] = useState(false)
+  const [isPrescribed, setIsPrescribed] = useState(false)
   const [lastLoadDate, setLastLoadDate] = useState(() =>
     new Date().toLocaleDateString('en-CA', { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone })
   )
@@ -74,6 +75,7 @@ export default function DashboardPage() {
     const body = await res.json()
     setWeeklyPlan(body.weeklyPlan ?? null)
     setFocus(body.focus ?? null)
+    setIsPrescribed(body.isProgramBased ?? false)
     if (body.rest) {
       setIsRestDay(true)
       setSuggestion(null)
@@ -325,7 +327,7 @@ export default function DashboardPage() {
             </p>
           </section>
         ) : (
-          <WorkoutCard workout={suggestion} loading={loading} />
+          <WorkoutCard workout={suggestion} loading={loading} isPrescribed={isPrescribed} />
         )}
 
         <section aria-label="Workout Actions" className="flex flex-col gap-xs">

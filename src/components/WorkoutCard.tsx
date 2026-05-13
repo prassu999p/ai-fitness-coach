@@ -3,9 +3,10 @@ import type { SuggestedWorkout } from '@/lib/types'
 interface Props {
   workout: SuggestedWorkout | null
   loading: boolean
+  isPrescribed?: boolean
 }
 
-export function WorkoutCard({ workout, loading }: Props) {
+export function WorkoutCard({ workout, loading, isPrescribed }: Props) {
   if (loading) {
     return (
       <div className="relative w-full rounded-2xl overflow-hidden border border-white/10 bg-surface-container h-[280px] animate-pulse">
@@ -41,8 +42,8 @@ export function WorkoutCard({ workout, loading }: Props) {
           {/* Top: Badge + menu */}
           <div className="mb-auto flex justify-between items-start">
             <div className="px-3 py-1 bg-primary-container text-on-primary-container font-label-caps text-label-caps rounded flex items-center gap-1 shadow-[0_0_15px_rgba(195,244,0,0.3)]">
-              <span className="material-symbols-outlined text-[14px]">bolt</span>
-              SUGGESTED
+              <span className="material-symbols-outlined text-[14px]">{isPrescribed ? 'verified' : 'bolt'}</span>
+              {isPrescribed ? 'PRESCRIBED' : 'SUGGESTED'}
             </div>
           </div>
 
