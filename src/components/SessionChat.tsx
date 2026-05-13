@@ -81,7 +81,7 @@ export function SessionChat({ workout, currentExercise, onClose, onAddExercise }
     setLoading(true)
 
     try {
-      const res = await fetch('/api/session-chat', {
+      const response = await fetch('/api/session-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -90,8 +90,28 @@ export function SessionChat({ workout, currentExercise, onClose, onAddExercise }
           userMessage: text,
         }),
       })
-      const data = await res.json()
-      setReply(data.reply)
+
+      if (!response.ok || !response.body) {
+        setReply("I'm having trouble connecting. Try a similar movement with the same equipment.")
+        return
+      }
+
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let accumulated = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        const chunk = decoder.decode(value, { stream: true })
+        for (const line of chunk.split('\n')) {
+          if (line.startsWith('0:')) {
+            try { accumulated += JSON.parse(line.slice(2)) as string } catch { /* skip malformed chunk */ }
+          }
+        }
+      }
+
+      setReply(accumulated || "I'm having trouble connecting. Try a similar movement with the same equipment.")
     } catch {
       setReply("I'm having trouble connecting. Try a similar movement with the same equipment.")
     } finally {

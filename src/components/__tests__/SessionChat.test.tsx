@@ -11,6 +11,35 @@ const mockWorkout: SuggestedWorkout = {
   ],
 }
 
+/**
+ * Build a mock fetch Response that simulates the Vercel AI SDK data-stream format.
+ * Text chunks are encoded as lines: `0:"<json-string>"\n`
+ * We mock getReader() to return the full payload in a single read, then signal done.
+ */
+function makeStreamResponse(reply: string): Partial<Response> {
+  // Encode the entire reply as a single data-stream line
+  const line = `0:${JSON.stringify(reply)}\n`
+
+  // Use Buffer (available in Node/Jest) to produce a Uint8Array-like value
+  const bytes = Buffer.from(line, 'utf8')
+
+  let called = false
+  const reader = {
+    read: jest.fn().mockImplementation(() => {
+      if (!called) {
+        called = true
+        return Promise.resolve({ done: false, value: bytes })
+      }
+      return Promise.resolve({ done: true, value: undefined })
+    }),
+  }
+
+  return {
+    ok: true,
+    body: { getReader: () => reader } as unknown as ReadableStream,
+  }
+}
+
 beforeEach(() => {
   global.fetch = jest.fn()
 })
@@ -21,10 +50,9 @@ afterEach(() => {
 
 describe('SessionChat', () => {
   it('does NOT show Add to Plan button when reply has no substitute', async () => {
-    ;(global.fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ reply: 'Keep your elbows at 45 degrees to protect your shoulders.' }),
-    })
+    ;(global.fetch as jest.Mock).mockResolvedValueOnce(
+      makeStreamResponse('Keep your elbows at 45 degrees to protect your shoulders.')
+    )
 
     render(
       <SessionChat
@@ -42,12 +70,9 @@ describe('SessionChat', () => {
   })
 
   it('shows Add to Plan button when AI reply contains substitute phrasing', async () => {
-    ;(global.fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        reply: 'I suggest you substitute with **Push-Ups** instead of bench press. They target the same muscles.',
-      }),
-    })
+    ;(global.fetch as jest.Mock).mockResolvedValueOnce(
+      makeStreamResponse('I suggest you substitute with **Push-Ups** instead of bench press. They target the same muscles.')
+    )
 
     render(
       <SessionChat
@@ -65,12 +90,9 @@ describe('SessionChat', () => {
   })
 
   it('calls onAddExercise with a valid SuggestedExercise when Add to Plan is clicked', async () => {
-    ;(global.fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        reply: 'Try substituting with "Push-Ups" instead. Great bodyweight option.',
-      }),
-    })
+    ;(global.fetch as jest.Mock).mockResolvedValueOnce(
+      makeStreamResponse('Try substituting with "Push-Ups" instead. Great bodyweight option.')
+    )
 
     const onAddExercise = jest.fn()
     render(
@@ -98,12 +120,9 @@ describe('SessionChat', () => {
   })
 
   it('hides Add to Plan button when onAddExercise prop is not provided', async () => {
-    ;(global.fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        reply: 'Try substituting with "Dumbbell Press" instead.',
-      }),
-    })
+    ;(global.fetch as jest.Mock).mockResolvedValueOnce(
+      makeStreamResponse('Try substituting with "Dumbbell Press" instead.')
+    )
 
     render(
       <SessionChat
@@ -121,12 +140,9 @@ describe('SessionChat', () => {
   })
 
   it('shows multiple Add to Plan buttons when AI reply contains multiple bolded exercises with substitute keywords', async () => {
-    ;(global.fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        reply: 'You can try these substitutes: 1. **Push-Ups** or 2. **Dips** instead.',
-      }),
-    })
+    ;(global.fetch as jest.Mock).mockResolvedValueOnce(
+      makeStreamResponse('You can try these substitutes: 1. **Push-Ups** or 2. **Dips** instead.')
+    )
 
     render(
       <SessionChat
@@ -139,7 +155,7 @@ describe('SessionChat', () => {
 
     fireEvent.click(screen.getByText('Suggest a substitute'))
     await waitFor(() => screen.getByText(/ADD "PUSH-UPS" TO PLAN/i))
-    
+
     expect(screen.getByText(/ADD "PUSH-UPS" TO PLAN/i)).toBeInTheDocument()
     expect(screen.getByText(/ADD "DIPS" TO PLAN/i)).toBeInTheDocument()
   })
