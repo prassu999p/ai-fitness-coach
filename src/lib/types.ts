@@ -159,6 +159,13 @@ export interface TrainerMessage {
   created_at: string
 }
 
+export interface PlanPreview {
+  phases: Array<{ name: string; week_range: [number, number]; focus: string; top_exercises: string[] }>
+  duration_weeks: number
+  sessions_per_week: number
+  notes: string
+}
+
 // Returned by get_workout_history when days > 14 (context-efficient summary)
 export interface PerformanceSummary {
   exercise_name: string

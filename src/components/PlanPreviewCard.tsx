@@ -1,9 +1,4 @@
-interface PlanPreview {
-  phases: Array<{ name: string; week_range: [number, number]; focus: string; top_exercises: string[] }>
-  duration_weeks: number
-  sessions_per_week: number
-  notes: string
-}
+import type { PlanPreview } from '@/lib/types'
 
 export function PlanPreviewCard({ preview }: { preview: PlanPreview }) {
   return (

@@ -58,14 +58,23 @@ export async function POST() {
       .update({ status: 'completed', reviewed_at: now })
       .eq('id', activeWeek.id)
 
-    const { error: activateError } = await supabase
+    const { data: activatedRows, error: activateError } = await supabase
       .from('program_weeks')
       .update({ status: 'active', updated_at: now })
       .eq('program_id', activeWeek.program_id)
       .eq('week_number', activeWeek.week_number + 1)
+      .select('id')
 
     if (completeError || activateError) {
       return NextResponse.json({ error: 'Review completed but status update failed' }, { status: 500 })
+    }
+
+    // Last week of the program — no next week row exists
+    if (!activatedRows || activatedRows.length === 0) {
+      await supabase
+        .from('training_programs')
+        .update({ status: 'completed' })
+        .eq('id', activeWeek.program_id)
     }
 
     return NextResponse.json({ success: true })

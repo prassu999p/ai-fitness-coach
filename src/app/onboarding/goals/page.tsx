@@ -2,7 +2,7 @@
 
 import { useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import type { PrimaryGoal } from '@/lib/types'
+import type { PrimaryGoal, PlanPreview } from '@/lib/types'
 import { PlanPreviewCard } from '@/components/PlanPreviewCard'
 
 const GOALS: Array<{ value: PrimaryGoal; label: string; description: string; icon: string }> = [
@@ -25,13 +25,6 @@ const GOAL_DURATION_NOTES: Record<PrimaryGoal, string> = {
   fat_loss: '4–8 weeks keeps intensity high enough to preserve muscle during a deficit.',
   endurance: '8–12 weeks builds aerobic base progressively without overtraining.',
   general_fitness: '4–8 weeks works well — enough time to see real progress across all qualities.',
-}
-
-interface PlanPreview {
-  phases: Array<{ name: string; week_range: [number, number]; focus: string; top_exercises: string[] }>
-  duration_weeks: number
-  sessions_per_week: number
-  notes: string
 }
 
 type Step = 1 | 2 | 3 | 4
@@ -237,8 +230,8 @@ function GoalsContent() {
             )}
 
             {error && (
-              <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-sm mt-md">
-                <p className="font-body-md text-[13px] text-red-400">{error}</p>
+              <div className="bg-error/10 border border-error/30 rounded-xl p-sm mt-md">
+                <p className="font-body-md text-[13px] text-error">{error}</p>
               </div>
             )}
           </div>
@@ -279,8 +272,8 @@ function GoalsContent() {
             )}
 
             {error && (
-              <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-sm mt-md">
-                <p className="font-body-md text-[13px] text-red-400">{error}</p>
+              <div className="bg-error/10 border border-error/30 rounded-xl p-sm mt-md">
+                <p className="font-body-md text-[13px] text-error">{error}</p>
               </div>
             )}
           </div>

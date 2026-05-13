@@ -255,7 +255,7 @@ export function createAgentTools(supabase: SupabaseClient, userId: string) {
 
         const { error } = await supabase
           .from('program_weeks')
-          .update({ adjustment_notes: reasoning, status: 'adjusted', prescribed: adjustments, updated_at: new Date().toISOString() })
+          .update({ adjustment_notes: reasoning, prescribed: adjustments, updated_at: new Date().toISOString() })
           .eq('program_id', program.id)
           .eq('week_number', week_number)
 
