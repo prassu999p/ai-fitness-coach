@@ -130,10 +130,11 @@ export function createAgentTools(supabase: SupabaseClient, userId: string) {
           .order('created_at', { ascending: false })
           .limit(6)
 
-        const history = (data ?? []).map((row: { weight_kg: number | null; reps: number | null; workouts: { date: string } | null }) => ({
-          weight_kg: row.weight_kg,
-          reps: row.reps,
-          date: row.workouts?.date ?? '',
+        type ExerciseHistoryRow = { weight_kg: number | null; reps: number | null; workouts: { date: string; user_id: string }[] }
+        const history = (data ?? [] as ExerciseHistoryRow[]).map((row) => ({
+          weight_kg: (row as ExerciseHistoryRow).weight_kg,
+          reps: (row as ExerciseHistoryRow).reps,
+          date: (row as ExerciseHistoryRow).workouts?.[0]?.date ?? '',
         }))
         const resolvedRpe = last_rpe ?? (data?.[0]?.perceived_effort ?? null)
 
