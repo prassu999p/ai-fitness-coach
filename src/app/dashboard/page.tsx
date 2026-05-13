@@ -8,7 +8,7 @@ import { BottomNav } from '@/components/BottomNav'
 import { format, startOfWeek, endOfWeek } from 'date-fns'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import type { Workout, SuggestedWorkout, WeeklyPlan, DayFocus, TrainerMessage, TrainingProgram } from '@/lib/types'
+import type { Workout, SuggestedWorkout, WeeklyPlan, TrainerMessage, TrainingProgram } from '@/lib/types'
 import { CoachingCard } from '@/components/CoachingCard'
 import { ProgramCard } from '@/components/ProgramCard'
 
@@ -24,7 +24,6 @@ export default function DashboardPage() {
   const [workouts, setWorkouts] = useState<Workout[]>([])
   const [suggestion, setSuggestion] = useState<SuggestedWorkout | null>(null)
   const [weeklyPlan, setWeeklyPlan] = useState<WeeklyPlan | null>(null)
-  const [focus, setFocus] = useState<DayFocus | null>(null)
   const [isRestDay, setIsRestDay] = useState(false)
   const [todayWorkoutId, setTodayWorkoutId] = useState<string | null>(null)
   const [todayHasLoggedExercises, setTodayHasLoggedExercises] = useState(false)
@@ -52,7 +51,6 @@ export default function DashboardPage() {
     if (!res.ok) return
     const body = await res.json()
     setWeeklyPlan(body.weeklyPlan ?? null)
-    setFocus(body.focus ?? null)
     setIsPrescribed(body.isProgramBased ?? false)
     if (body.rest) {
       setIsRestDay(true)
@@ -277,8 +275,7 @@ export default function DashboardPage() {
                   if (startingWorkout) return
                   setStartingWorkout(true)
                   try {
-                    const supabaseClient = createClient()
-                    const { data: { user } } = await supabaseClient.auth.getUser()
+                    const { data: { user } } = await supabase.auth.getUser()
                     if (!user) return
 
                     const userTz = Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -292,7 +289,7 @@ export default function DashboardPage() {
                     const body = await res.json() as { suggestion?: SuggestedWorkout; rest?: boolean }
                     if (body.rest || !body.suggestion) return
 
-                    const { data } = await supabaseClient.from('workouts').insert({
+                    const { data } = await supabase.from('workouts').insert({
                       user_id: user.id,
                       date: localDate,
                       status: 'in_progress',
@@ -334,8 +331,6 @@ export default function DashboardPage() {
           </Link>
         </section>
 
-        {/* Suppress unused warning for `focus` */}
-        {focus && <span className="sr-only">Focus: {focus}</span>}
       </main>
 
       <BottomNav />

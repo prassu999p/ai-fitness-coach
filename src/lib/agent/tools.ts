@@ -91,7 +91,7 @@ export function createAgentTools(supabase: SupabaseClient, userId: string) {
           .select('*')
           .eq('program_id', program.id)
           .eq('status', 'active')
-          .single()
+          .maybeSingle()
 
         return { program, activeWeek: activeWeek ?? null }
       },
@@ -130,11 +130,11 @@ export function createAgentTools(supabase: SupabaseClient, userId: string) {
           .order('created_at', { ascending: false })
           .limit(6)
 
-        type ExerciseHistoryRow = { weight_kg: number | null; reps: number | null; workouts: { date: string; user_id: string }[] }
+        type ExerciseHistoryRow = { weight_kg: number | null; reps: number | null; workouts: { date: string; user_id: string } | null }
         const history = (data ?? [] as ExerciseHistoryRow[]).map((row) => ({
           weight_kg: (row as ExerciseHistoryRow).weight_kg,
           reps: (row as ExerciseHistoryRow).reps,
-          date: (row as ExerciseHistoryRow).workouts?.[0]?.date ?? '',
+          date: (row as ExerciseHistoryRow).workouts?.date ?? '',
         }))
         const resolvedRpe = last_rpe ?? (data?.[0]?.perceived_effort ?? null)
 
@@ -328,9 +328,9 @@ export function createAgentTools(supabase: SupabaseClient, userId: string) {
           adjustment_notes: `Shifted +${shift_days} days: ${reason}`,
         }))
 
-        for (const upd of updates) {
-          await supabase.from('program_weeks').update({ week_start: upd.week_start, adjustment_notes: upd.adjustment_notes, updated_at: new Date().toISOString() }).eq('id', upd.id)
-        }
+        await Promise.all(updates.map((upd) =>
+          supabase.from('program_weeks').update({ week_start: upd.week_start, adjustment_notes: upd.adjustment_notes, updated_at: new Date().toISOString() }).eq('id', upd.id)
+        ))
 
         return { success: true, shifted: updates.length }
       },
