@@ -28,7 +28,6 @@ export async function POST(request: Request) {
   const userMessage = typeof body.message === 'string' ? body.message.trim().slice(0, 2000) : ''
   if (!userMessage) return new Response('Bad Request', { status: 400 })
 
-  // Persist user message
   await supabase.from('trainer_messages').insert({
     user_id: user.id,
     role: 'user',
@@ -38,24 +37,18 @@ export async function POST(request: Request) {
 
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 15_000)
+  const clearTimer = () => clearTimeout(timeout)
 
-  try {
-    const result = streamText({
-      model: agentModel,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: userMessage }],
-      tools: createAgentTools(supabase, user.id),
-      stopWhen: stepCountIs(6),
-      abortSignal: controller.signal,
-      onFinish: () => clearTimeout(timeout),
-    })
+  const result = streamText({
+    model: agentModel,
+    system: SYSTEM_PROMPT,
+    messages: [{ role: 'user', content: userMessage }],
+    tools: createAgentTools(supabase, user.id),
+    stopWhen: stepCountIs(6),
+    abortSignal: AbortSignal.any([controller.signal, request.signal]),
+    onFinish: clearTimer,
+    onError: clearTimer,
+  })
 
-    return result.toTextStreamResponse()
-  } catch {
-    clearTimeout(timeout)
-    return new Response(
-      JSON.stringify({ error: 'Something went wrong, try again.' }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
-    )
-  }
+  return result.toTextStreamResponse()
 }

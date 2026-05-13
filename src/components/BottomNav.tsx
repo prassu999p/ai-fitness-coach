@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 const NAV_ITEMS = [
@@ -15,7 +15,7 @@ const NAV_ITEMS = [
 export function BottomNav() {
   const pathname = usePathname()
   const [unreadCount, setUnreadCount] = useState(0)
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   useEffect(() => {
     async function fetchUnread() {
@@ -30,8 +30,7 @@ export function BottomNav() {
       setUnreadCount(count ?? 0)
     }
     fetchUnread()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname])
+  }, [pathname, supabase])
 
   return (
     <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-50 bg-surface/90 backdrop-blur-xl border-t border-white/[0.06]">
@@ -51,7 +50,7 @@ export function BottomNav() {
             >
               <span
                 className="material-symbols-outlined text-[22px]"
-                style={isActive ? { fontVariationSettings: "'FILL' 1" } : {}}
+                style={isActive ? { fontVariationSettings: "'FILL' 1" } : undefined}
               >
                 {item.icon}
               </span>
