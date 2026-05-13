@@ -130,10 +130,10 @@ export function createAgentTools(supabase: SupabaseClient, userId: string) {
           .order('created_at', { ascending: false })
           .limit(6)
 
-        const history = (data ?? []).map((row: any) => ({
+        const history = (data ?? []).map((row: { weight_kg: number | null; reps: number | null; workouts: { date: string } | null }) => ({
           weight_kg: row.weight_kg,
           reps: row.reps,
-          date: row.workouts.date,
+          date: row.workouts?.date ?? '',
         }))
         const resolvedRpe = last_rpe ?? (data?.[0]?.perceived_effort ?? null)
 
@@ -254,7 +254,7 @@ export function createAgentTools(supabase: SupabaseClient, userId: string) {
 
         const { error } = await supabase
           .from('program_weeks')
-          .update({ adjustment_notes: reasoning, status: 'adjusted', prescribed: adjustments })
+          .update({ adjustment_notes: reasoning, status: 'adjusted', prescribed: adjustments, updated_at: new Date().toISOString() })
           .eq('program_id', program.id)
           .eq('week_number', week_number)
 
@@ -328,7 +328,7 @@ export function createAgentTools(supabase: SupabaseClient, userId: string) {
         }))
 
         for (const upd of updates) {
-          await supabase.from('program_weeks').update({ week_start: upd.week_start, adjustment_notes: upd.adjustment_notes }).eq('id', upd.id)
+          await supabase.from('program_weeks').update({ week_start: upd.week_start, adjustment_notes: upd.adjustment_notes, updated_at: new Date().toISOString() }).eq('id', upd.id)
         }
 
         return { success: true, shifted: updates.length }

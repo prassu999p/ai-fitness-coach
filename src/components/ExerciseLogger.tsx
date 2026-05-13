@@ -55,9 +55,10 @@ export function ExerciseLogger({ exercise, onComplete, sortOrder = 0 }: Props) {
         set_number: i + 1,
         weight_kg: row.weight ? parseFloat(row.weight) : null,
         reps: row.reps ? parseInt(row.reps) : null,
-        perceived_effort: row.effort ?? 5,
+        perceived_effort: row.effort,
       }))
-      const avgEffort = Math.round(sets.reduce((s, r) => s + (r.perceived_effort ?? 5), 0) / sets.length)
+      const validEfforts = sets.map(r => r.perceived_effort).filter((v): v is number => v !== null)
+      const avgEffort = validEfforts.length ? Math.round(validEfforts.reduce((s, v) => s + v, 0) / validEfforts.length) : null
       onComplete({
         exercise: {
           exercise_name: exercise.name,
@@ -81,10 +82,10 @@ export function ExerciseLogger({ exercise, onComplete, sortOrder = 0 }: Props) {
           reps: null,
           weight_kg: null,
           duration_minutes: dur,
-          perceived_effort: cardioEffort ?? 5,
+          perceived_effort: cardioEffort,
           sort_order: sortOrder,
         },
-        sets: [{ set_number: 1, weight_kg: null, reps: null, perceived_effort: cardioEffort ?? 5 }],
+        sets: [{ set_number: 1, weight_kg: null, reps: null, perceived_effort: cardioEffort }],
       })
     }
   }

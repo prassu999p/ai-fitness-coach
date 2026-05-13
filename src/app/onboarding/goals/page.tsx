@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type { PrimaryGoal } from '@/lib/types'
 import { PlanPreviewCard } from '@/components/PlanPreviewCard'
@@ -36,7 +36,7 @@ interface PlanPreview {
 
 type Step = 1 | 2 | 3 | 4
 
-export default function GoalsPage() {
+function GoalsContent() {
   const [step, setStep] = useState<Step>(1)
   const [goal, setGoal] = useState<PrimaryGoal>('hypertrophy')
   const [durationWeeks, setDurationWeeks] = useState(8)
@@ -367,5 +367,13 @@ export default function GoalsPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function GoalsPage() {
+  return (
+    <Suspense>
+      <GoalsContent />
+    </Suspense>
   )
 }

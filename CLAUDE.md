@@ -19,6 +19,7 @@ Create a `.env.local` file with:
 ```
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
+ANTHROPIC_API_KEY=sk-ant-...
 OPENROUTER_API_KEY=
 OPENROUTER_MODEL=deepseek/deepseek-chat   # optional, this is the default
 ```

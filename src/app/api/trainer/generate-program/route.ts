@@ -3,6 +3,7 @@ import { generateText, stepCountIs } from 'ai'
 import { createClient } from '@/lib/supabase/server'
 import { agentModel } from '@/lib/agent/client'
 import { createAgentTools } from '@/lib/agent/tools'
+import { validateProgram } from '@/lib/agent/validateProgram'
 import { format } from 'date-fns'
 
 export const maxDuration = 60
@@ -88,6 +89,19 @@ export async function POST(req: NextRequest) {
   // action === 'confirm'
   if (!body.draftProgram) return NextResponse.json({ error: 'draftProgram required' }, { status: 400 })
 
+  // Validate and normalise draftProgram before embedding in prompt
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let sanitizedDraft: object
+  try {
+    const validation = validateProgram(body.draftProgram as Parameters<typeof validateProgram>[0])
+    if (!validation.valid) {
+      return NextResponse.json({ error: `Invalid draft program: ${validation.errors.join('; ')}` }, { status: 400 })
+    }
+    sanitizedDraft = validation.normalized
+  } catch {
+    return NextResponse.json({ error: 'Invalid draft program structure' }, { status: 400 })
+  }
+
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 30_000)
 
@@ -97,7 +111,7 @@ export async function POST(req: NextRequest) {
       system: COMMIT_SYSTEM,
       messages: [{
         role: 'user',
-        content: `Commit this program to the database:\n\`\`\`json\n${JSON.stringify(body.draftProgram)}\`\`\`${feedback ? `\n\nUser asked to change: ${feedback}` : ''}`,
+        content: `Commit this program to the database:\n\`\`\`json\n${JSON.stringify(sanitizedDraft)}\`\`\`${feedback ? `\n\nUser asked to change: ${feedback}` : ''}`,
       }],
       tools,
       stopWhen: stepCountIs(6),
