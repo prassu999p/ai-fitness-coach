@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { callOpenRouter } from '@/lib/openrouter'
 import { buildWorkoutPrompt, buildWeeklyPlanPrompt } from '@/lib/prompts'
-import { format, startOfWeek, differenceInDays, parseISO } from 'date-fns'
+import { format, startOfWeek, differenceInDays, parseISO, addDays } from 'date-fns'
 import { calculateProgressiveOverload } from '@/lib/progressiveOverload'
 import type {
   SuggestedWorkout,
@@ -38,10 +38,10 @@ export async function POST(req: NextRequest) {
     ? body.localDate
     : new Date().toLocaleDateString('en-CA', { timeZone: userTz })
 
-  const now = new Date()
-  const dayOfWeek = format(now, 'EEEE')
-  const weekStart = format(startOfWeek(now, { weekStartsOn: 1 }), 'yyyy-MM-dd')
-  const todayDayKey = dayKeyFor(now)
+  const parsedLocalDate = parseISO(localDate)
+  const dayOfWeek = format(parsedLocalDate, 'EEEE')
+  const weekStart = format(startOfWeek(parsedLocalDate, { weekStartsOn: 1 }), 'yyyy-MM-dd')
+  const todayDayKey = dayKeyFor(parsedLocalDate)
 
   const [{ data: profile }, { data: equipment }] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', user.id).single(),
@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
 
   if (program) {
     // Program-based path
-    const weekNum = currentWeekNumber(program as TrainingProgram, now)
+    const weekNum = currentWeekNumber(program as TrainingProgram, parsedLocalDate)
     const weekSlots = (program.week_plan as Record<string, Record<string, { focus: string; exercises?: Array<{ name: string; sets: number; reps: number; weight_kg?: number }> }>>)[String(weekNum)]
 
     const todaySlot = weekSlots?.[todayDayKey]
@@ -153,7 +153,7 @@ export async function POST(req: NextRequest) {
   // Fallback: existing LLM-based ad-hoc path (no active program)
   const model = process.env.OPENROUTER_MODEL ?? 'deepseek/deepseek-chat'
 
-  const fourteenDaysAgo = format(new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd')
+  const fourteenDaysAgo = format(addDays(parsedLocalDate, -14), 'yyyy-MM-dd')
   const { data: recentWorkouts } = await supabase
     .from('workouts')
     .select('*, workout_exercises(*)')
@@ -205,7 +205,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (!weeklyPlan) return NextResponse.json({ error: 'Could not load weekly plan' }, { status: 503 })
-  const focus: DayFocus = weeklyPlan.day_slots[dayKeyFor(now)] ?? 'rest'
+  const focus: DayFocus = weeklyPlan.day_slots[dayKeyFor(parsedLocalDate)] ?? 'rest'
   if (focus === 'rest') return NextResponse.json({ rest: true, weeklyPlan, focus })
 
   // Check cache using localDate

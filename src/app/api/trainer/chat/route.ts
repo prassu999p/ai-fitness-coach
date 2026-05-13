@@ -46,7 +46,19 @@ export async function POST(request: Request) {
     tools: createAgentTools(supabase, user.id),
     stopWhen: stepCountIs(6),
     abortSignal: AbortSignal.any([controller.signal, request.signal]),
-    onFinish: clearTimer,
+    onFinish: async ({ text, toolCalls }) => {
+      clearTimer()
+      // Persist trainer reply if the model didn't call add_trainer_message itself
+      const savedByTool = toolCalls.some(t => t.toolName === 'add_trainer_message')
+      if (!savedByTool && text) {
+        await supabase.from('trainer_messages').insert({
+          user_id: user.id,
+          role: 'trainer',
+          content: text,
+          message_type: 'chat',
+        })
+      }
+    },
     onError: clearTimer,
   })
 

@@ -28,13 +28,14 @@ export async function POST() {
     return NextResponse.json({ skipped: true, reason: 'no active week' })
   }
 
-  const { error: claimError } = await supabase
+  const { data: claimed, error: claimError } = await supabase
     .from('program_weeks')
     .update({ status: 'reviewing', updated_at: new Date().toISOString() })
     .eq('id', activeWeek.id)
     .eq('status', 'active')
+    .select('id')
 
-  if (claimError) {
+  if (claimError || !claimed || claimed.length === 0) {
     return NextResponse.json({ skipped: true, reason: 'already claimed' })
   }
 

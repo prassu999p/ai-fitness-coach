@@ -20,6 +20,7 @@ export function RpeSelector({ value, onChange }: Props) {
         {Array.from({ length: 10 }, (_, i) => i + 1).map(n => (
           <button
             key={n}
+            type="button"
             onClick={() => onChange(n)}
             className={`w-8 h-8 rounded text-xs font-mono font-bold transition-colors ${
               value === n

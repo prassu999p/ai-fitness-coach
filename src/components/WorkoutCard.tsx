@@ -29,7 +29,7 @@ export function WorkoutCard({ workout, loading, isPrescribed }: Props) {
   }
 
   return (
-    <section aria-label="Suggested Workout">
+    <section aria-label={isPrescribed ? 'Prescribed Workout' : 'Suggested Workout'}>
       <div className="relative w-full rounded-2xl overflow-hidden border border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.6)] group block">
         {/* Dark gradient background */}
         <div className="absolute inset-0 bg-surface-dim">

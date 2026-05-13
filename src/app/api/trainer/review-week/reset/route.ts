@@ -6,11 +6,15 @@ export async function PATCH() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const STALE_MS = 10 * 60 * 1000
+  const staleTimestamp = new Date(Date.now() - STALE_MS).toISOString()
+
   const { error } = await supabase
     .from('program_weeks')
     .update({ status: 'active', updated_at: new Date().toISOString() })
     .eq('user_id', user.id)
     .eq('status', 'reviewing')
+    .lt('updated_at', staleTimestamp)
 
   if (error) {
     return NextResponse.json({ error: 'Failed to reset' }, { status: 500 })

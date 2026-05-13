@@ -42,7 +42,10 @@ function GoalsContent() {
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
   const searchParams = useSearchParams()
-  const returnTo = searchParams.get('returnTo') ?? '/dashboard'
+  const rawReturnTo = searchParams.get('returnTo')
+  const returnTo = rawReturnTo && rawReturnTo.startsWith('/') && !rawReturnTo.startsWith('//')
+    ? rawReturnTo
+    : '/dashboard'
 
   const progressSegments = [step >= 1, step >= 2, step >= 3, step >= 4]
 

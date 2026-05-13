@@ -20,7 +20,7 @@ export function ProgramCard({ program }: Props) {
   const today = new Date()
   const start = parseISO(program.start_date)
   const daysSinceStart = differenceInDays(today, start)
-  const currentWeek = Math.min(Math.ceil((daysSinceStart + 1) / 7), program.duration_weeks)
+  const currentWeek = Math.max(1, Math.min(Math.ceil((daysSinceStart + 1) / 7), program.duration_weeks))
   const progressPct = Math.round((currentWeek / program.duration_weeks) * 100)
 
   const activePhase = program.phases.find(

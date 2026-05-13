@@ -62,18 +62,27 @@ export async function POST(req: NextRequest) {
       const { text } = await generateText({
         model: agentModel,
         system: PREVIEW_SYSTEM + `\nToday: ${format(new Date(), 'yyyy-MM-dd')}. Goal: ${goal}. Duration: ${durationWeeks} weeks.${feedback ? `\nUser feedback on previous draft: ${feedback}` : ''}`,
-        messages: [{ role: 'user', content: feedback ? `Revise the program based on my feedback: ${feedback}` : 'Generate my program now.' }],
+        messages: [{ role: 'user', content: (action === 'revise' && body.draftProgram)
+          ? `Revise this program:\n\`\`\`json\n${JSON.stringify(body.draftProgram)}\n\`\`\`\n\nFeedback: ${feedback ?? 'General revision'}`
+          : 'Generate my program now.' }],
         tools: { get_user_profile: tools.get_user_profile, get_workout_history: tools.get_workout_history },
         stopWhen: stepCountIs(3),
         abortSignal: controller.signal,
       })
       clearTimeout(timeout)
 
-      let parsed: { preview: object; program: object }
+      let parsed: { preview: unknown; program: unknown }
       try {
         parsed = JSON.parse(text)
       } catch {
         return NextResponse.json({ error: 'Agent returned malformed JSON' }, { status: 500 })
+      }
+      if (
+        !parsed || typeof parsed !== 'object' ||
+        !parsed.preview || typeof parsed.preview !== 'object' || Array.isArray(parsed.preview) ||
+        !parsed.program || typeof parsed.program !== 'object' || Array.isArray(parsed.program)
+      ) {
+        return NextResponse.json({ error: 'Agent returned invalid payload' }, { status: 500 })
       }
       return NextResponse.json({ preview: parsed.preview, draftProgram: parsed.program })
     } catch (error) {

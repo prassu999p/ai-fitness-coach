@@ -44,12 +44,23 @@ export async function POST(request: Request) {
 
   const result = streamText({
     model: agentModel,
-    system: `You are a personal trainer coaching during an active workout session. The user is currently doing: ${exerciseName}. Today's workout: ${JSON.stringify(body.todayWorkout)}. Available equipment: ${equipmentList || 'bodyweight only'}. Give a 2-3 sentence practical response. If suggesting a substitute, name it specifically. Call add_trainer_message to save your reply.`,
+    system: `You are a personal trainer coaching during an active workout session. The user is currently doing: ${exerciseName}. Today's workout: ${JSON.stringify(body.todayWorkout)}. Available equipment: ${equipmentList || 'bodyweight only'}. Give a 2-3 sentence practical response. If suggesting a substitute, name it specifically.`,
     messages: [{ role: 'user', content: body.userMessage }],
     tools: createAgentTools(supabase, user.id),
     stopWhen: stepCountIs(3),
     abortSignal: AbortSignal.any([controller.signal, request.signal]),
-    onFinish: () => clearTimeout(timeout),
+    onFinish: async ({ text }) => {
+      clearTimeout(timeout)
+      if (text) {
+        await supabase.from('trainer_messages').insert({
+          user_id: user.id,
+          role: 'trainer',
+          content: text,
+          message_type: 'session_feedback',
+          metadata: { exerciseName },
+        })
+      }
+    },
     onError: () => clearTimeout(timeout),
   })
 

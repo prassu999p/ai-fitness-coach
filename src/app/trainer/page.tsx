@@ -126,7 +126,7 @@ export default function TrainerPage() {
         return
       }
 
-      // Read response body as stream
+      // Read response body as stream (toTextStreamResponse emits plain text tokens)
       const reader = response.body.getReader()
       const decoder = new TextDecoder()
       let accumulated = ''
@@ -134,21 +134,8 @@ export default function TrainerPage() {
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
-
-        const chunk = decoder.decode(value, { stream: true })
-        const lines = chunk.split('\n')
-
-        for (const line of lines) {
-          if (line.startsWith('0:')) {
-            try {
-              const jsonValue = JSON.parse(line.slice(2))
-              accumulated += jsonValue
-              setStreamContent(accumulated)
-            } catch {
-              // skip malformed line
-            }
-          }
-        }
+        accumulated += decoder.decode(value, { stream: true })
+        setStreamContent(accumulated)
       }
 
       // Reload history from DB
@@ -216,7 +203,7 @@ export default function TrainerPage() {
               No Program
             </p>
             <p className="font-body-md text-[14px] text-on-surface-variant">
-              You don't have an active training program yet. Head to Profile → Change Program to get started with a personalized plan.
+              {"You don't have an active training program yet. Head to Profile → Change Program to get started with a personalized plan."}
             </p>
           </div>
         )}
