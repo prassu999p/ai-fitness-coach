@@ -10,7 +10,7 @@ interface Props {
 
 const STATUS_COLOR = {
   completed: 'text-primary-container',
-  active: 'text-cyan-400',
+  active: 'text-secondary-container',
   upcoming: 'text-on-surface-variant/40',
 }
 
@@ -85,7 +85,7 @@ export function ProgramCard({ program }: Props) {
                     <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
                   ) : isActive ? (
                     <span className="inline-flex items-center gap-[4px]">
-                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-secondary-container animate-pulse" />
                       NOW
                     </span>
                   ) : (
