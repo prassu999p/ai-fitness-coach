@@ -10,7 +10,7 @@ interface Props {
   streamContent: string
 }
 
-function MessageBubble({ msg }: { msg: TrainerMessage & { id: string } }) {
+function MessageBubble({ msg }: { msg: TrainerMessage }) {
   const isTrainer = msg.role === 'trainer'
 
   if (isTrainer && (msg.message_type === 'weekly_review' || msg.message_type === 'check_in')) {
