@@ -21,12 +21,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
   }
 
+  const exerciseName = typeof body.exerciseName === 'string' ? body.exerciseName.slice(0, 100) : ''
+
   const { data: equipment } = await supabase
     .from('user_equipment')
-    .select('*')
+    .select('equipment_name')
     .eq('user_id', user.id)
 
-  const equipmentList = (equipment ?? []).map((e: { name: string }) => e.name).join(', ')
+  const equipmentList = (equipment ?? []).map((e: { equipment_name: string }) => e.equipment_name).join(', ')
 
   // Persist user message
   await supabase.from('trainer_messages').insert({
@@ -34,7 +36,7 @@ export async function POST(request: Request) {
     role: 'user',
     content: body.userMessage,
     message_type: 'session_feedback',
-    metadata: { exerciseName: body.exerciseName },
+    metadata: { exerciseName },
   })
 
   const controller = new AbortController()
@@ -42,7 +44,7 @@ export async function POST(request: Request) {
 
   const result = streamText({
     model: agentModel,
-    system: `You are a personal trainer coaching during an active workout session. The user is currently doing: ${body.exerciseName}. Today's workout: ${JSON.stringify(body.todayWorkout)}. Available equipment: ${equipmentList || 'bodyweight only'}. Give a 2-3 sentence practical response. If suggesting a substitute, name it specifically. Call add_trainer_message to save your reply.`,
+    system: `You are a personal trainer coaching during an active workout session. The user is currently doing: ${exerciseName}. Today's workout: ${JSON.stringify(body.todayWorkout)}. Available equipment: ${equipmentList || 'bodyweight only'}. Give a 2-3 sentence practical response. If suggesting a substitute, name it specifically. Call add_trainer_message to save your reply.`,
     messages: [{ role: 'user', content: body.userMessage }],
     tools: createAgentTools(supabase, user.id),
     stopWhen: stepCountIs(3),
