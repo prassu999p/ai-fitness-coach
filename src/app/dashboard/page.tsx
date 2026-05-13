@@ -8,9 +8,8 @@ import { BottomNav } from '@/components/BottomNav'
 import { format, startOfWeek, endOfWeek, addDays } from 'date-fns'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import type { Workout, SuggestedWorkout, WeeklyPlan, DayFocus, DayKey } from '@/lib/types'
+import type { Workout, SuggestedWorkout, WeeklyPlan, DayFocus, DayKey, TrainerMessage } from '@/lib/types'
 import { CoachingCard } from '@/components/CoachingCard'
-import type { TrainerMessage } from '@/lib/types'
 
 function getGreeting() {
   const h = new Date().getHours()
@@ -101,6 +100,7 @@ export default function DashboardPage() {
       .from('trainer_messages')
       .update({ read_at: new Date().toISOString() })
       .eq('id', id)
+    // silent fail is intentional — card stays dismissed locally; reappears on next load if write fails
   }
 
   useEffect(() => {
