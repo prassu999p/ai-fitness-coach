@@ -55,11 +55,21 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [regenerating, setRegenerating] = useState(false)
   const [planExpanded, setPlanExpanded] = useState(false)
+  const [startingWorkout, setStartingWorkout] = useState(false)
+  const [lastLoadDate, setLastLoadDate] = useState(() =>
+    new Date().toLocaleDateString('en-CA', { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone })
+  )
   const router = useRouter()
   const supabase = createClient()
 
-  async function loadSuggestion() {
-    const res = await fetch('/api/suggest-workout', { method: 'POST' })
+  async function loadSuggestion(localDate?: string) {
+    const userTz = Intl.DateTimeFormat().resolvedOptions().timeZone
+    const date = localDate ?? new Date().toLocaleDateString('en-CA', { timeZone: userTz })
+    const res = await fetch('/api/suggest-workout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ localDate: date }),
+    })
     if (!res.ok) return
     const body = await res.json()
     setWeeklyPlan(body.weeklyPlan ?? null)
@@ -143,6 +153,21 @@ export default function DashboardPage() {
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    function handleVisibility() {
+      if (document.visibilityState !== 'visible') return
+      const userTz = Intl.DateTimeFormat().resolvedOptions().timeZone
+      const today = new Date().toLocaleDateString('en-CA', { timeZone: userTz })
+      if (today !== lastLoadDate) {
+        setLastLoadDate(today)
+        loadSuggestion(today)
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
+  // loadSuggestion uses only setState dispatchers and its localDate arg — no stale closure risk
+  }, [lastLoadDate]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Build week day data for the expanded plan view
   const monday = startOfWeek(new Date(), { weekStartsOn: 1 })
@@ -319,23 +344,42 @@ export default function DashboardPage() {
             suggestion && (
               <button
                 id="start-workout-btn"
+                disabled={startingWorkout}
                 onClick={async () => {
-                  const supabaseClient = createClient()
-                  const { data: { user } } = await supabaseClient.auth.getUser()
-                  if (!user) return
-                  const todayDate = format(new Date(), 'yyyy-MM-dd')
-                  const { data } = await supabaseClient.from('workouts').insert({
-                    user_id: user.id,
-                    date: todayDate,
-                    status: 'in_progress',
-                    suggestion_snapshot: suggestion,
-                  }).select().single()
-                  if (data) {
-                    setTodayWorkoutId(data.id)
-                    router.push(`/workout/${data.id}`)
+                  if (startingWorkout) return
+                  setStartingWorkout(true)
+                  try {
+                    const supabaseClient = createClient()
+                    const { data: { user } } = await supabaseClient.auth.getUser()
+                    if (!user) return
+
+                    const userTz = Intl.DateTimeFormat().resolvedOptions().timeZone
+                    const localDate = new Date().toLocaleDateString('en-CA', { timeZone: userTz })
+                    const res = await fetch('/api/suggest-workout', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ localDate }),
+                    })
+                    if (!res.ok) return
+                    const body = await res.json() as { suggestion?: SuggestedWorkout; rest?: boolean }
+                    if (body.rest || !body.suggestion) return
+
+                    const { data } = await supabaseClient.from('workouts').insert({
+                      user_id: user.id,
+                      date: localDate,
+                      status: 'in_progress',
+                      suggestion_snapshot: body.suggestion,
+                    }).select().single()
+
+                    if (data) {
+                      setTodayWorkoutId(data.id)
+                      router.push(`/workout/${data.id}`)
+                    }
+                  } finally {
+                    setStartingWorkout(false)
                   }
                 }}
-                className="w-full relative overflow-hidden bg-primary-container text-on-primary-container font-label-caps text-[14px] py-4 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-xs font-bold tracking-wider"
+                className="w-full relative overflow-hidden bg-primary-container text-on-primary-container font-label-caps text-[14px] py-4 rounded-xl hover:brightness-110 active:scale-[0.98] disabled:opacity-60 transition-all duration-200 flex items-center justify-center gap-xs font-bold tracking-wider"
               >
                 <span className="material-symbols-outlined text-[22px]" style={{ fontVariationSettings: "'FILL' 1" }}>play_arrow</span>
                 START WORKOUT
