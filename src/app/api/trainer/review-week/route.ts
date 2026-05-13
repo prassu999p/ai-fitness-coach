@@ -42,6 +42,7 @@ export async function POST() {
   const timeout = setTimeout(() => controller.abort(), 20_000)
 
   try {
+    const now = new Date().toISOString()
     await generateText({
       model: agentModel,
       system: SYSTEM_PROMPT,
@@ -52,16 +53,20 @@ export async function POST() {
     })
     clearTimeout(timeout)
 
-    await supabase
+    const { error: completeError } = await supabase
       .from('program_weeks')
-      .update({ status: 'completed', reviewed_at: new Date().toISOString() })
+      .update({ status: 'completed', reviewed_at: now })
       .eq('id', activeWeek.id)
 
-    await supabase
+    const { error: activateError } = await supabase
       .from('program_weeks')
-      .update({ status: 'active', updated_at: new Date().toISOString() })
+      .update({ status: 'active', updated_at: now })
       .eq('program_id', activeWeek.program_id)
       .eq('week_number', activeWeek.week_number + 1)
+
+    if (completeError || activateError) {
+      return NextResponse.json({ error: 'Review completed but status update failed' }, { status: 500 })
+    }
 
     return NextResponse.json({ success: true })
   } catch (error) {

@@ -12,5 +12,8 @@ export async function PATCH() {
     .eq('user_id', user.id)
     .eq('status', 'reviewing')
 
-  return NextResponse.json({ success: !error })
+  if (error) {
+    return NextResponse.json({ error: 'Failed to reset' }, { status: 500 })
+  }
+  return NextResponse.json({ success: true })
 }
