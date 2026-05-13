@@ -1,11 +1,12 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { differenceInDays, parseISO } from 'date-fns'
 import { createClient } from '@/lib/supabase/client'
 import { TrainerChatThread } from '@/components/TrainerChatThread'
 import { BottomNav } from '@/components/BottomNav'
-import type { TrainerMessage, TrainingProgram, ProgramPhase } from '@/lib/types'
+import type { TrainerMessage, TrainingProgram } from '@/lib/types'
 
 export default function TrainerPage() {
   const [history, setHistory] = useState<TrainerMessage[]>([])
@@ -15,6 +16,7 @@ export default function TrainerPage() {
   const [isStreaming, setIsStreaming] = useState(false)
   const [streamContent, setStreamContent] = useState('')
   const [loading, setLoading] = useState(true)
+  const [userId, setUserId] = useState('')
   const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
 
@@ -22,6 +24,7 @@ export default function TrainerPage() {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
+      setUserId(user.id)
 
       // Mark all unread trainer messages as read
       await supabase
@@ -90,7 +93,7 @@ export default function TrainerPage() {
     // Optimistically append user message
     const tempUserMsg: TrainerMessage = {
       id: `temp-${Date.now()}`,
-      user_id: '',
+      user_id: userId,
       role: 'user',
       content: msg,
       message_type: 'chat',
@@ -164,10 +167,16 @@ export default function TrainerPage() {
   }
 
   // Derive active phase
-  const activePhase: ProgramPhase | null = program
-    ? program.phases.find((p: ProgramPhase) => {
-        const [, max] = p.week_range
-        return max <= program.duration_weeks
+  const weekNum = program
+    ? Math.max(1, Math.min(
+        Math.ceil((differenceInDays(new Date(), parseISO(program.start_date)) + 1) / 7),
+        program.duration_weeks
+      ))
+    : 1
+  const activePhase = program
+    ? program.phases.find(p => {
+        const [min, max] = p.week_range
+        return weekNum >= min && weekNum <= max
       }) ?? program.phases[0]
     : null
 
@@ -218,7 +227,7 @@ export default function TrainerPage() {
             ? Date.now() - new Date(activeWeek.updated_at).getTime() > 10 * 60 * 1000
             : false
           return isStale ? (
-            <div className="bg-surface-container-high rounded-xl p-3 flex items-center justify-between gap-3">
+            <div className="bg-surface-container-high rounded-xl p-sm flex items-center justify-between gap-sm">
               <p className="text-sm text-on-surface-variant">Review didn't finish.</p>
               <button
                 onClick={async () => {
@@ -231,7 +240,7 @@ export default function TrainerPage() {
               </button>
             </div>
           ) : (
-            <div className="bg-surface-container-high rounded-xl p-3 flex items-center gap-3">
+            <div className="bg-surface-container-high rounded-xl p-sm flex items-center gap-sm">
               <div className="w-2 h-2 rounded-full bg-primary-container animate-pulse" />
               <p className="text-sm text-on-surface-variant">Your trainer is reviewing last week…</p>
             </div>
@@ -257,6 +266,7 @@ export default function TrainerPage() {
       {/* Pinned input bar */}
       <div className="fixed bottom-[64px] left-1/2 -translate-x-1/2 w-full max-w-md z-40 bg-surface/80 backdrop-blur-xl border-t border-white/[0.06] px-margin py-xs">
         <div className="flex items-end gap-xs bg-surface-container border border-white/[0.08] rounded-2xl px-sm py-xs">
+          {/* fieldSizing is not yet in @types/react CSSProperties */}
           <textarea
             value={input}
             onChange={e => setInput(e.target.value)}
