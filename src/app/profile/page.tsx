@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { BottomNav } from '@/components/BottomNav'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import type { FitnessLevel, SplitType } from '@/lib/types'
 import { EQUIPMENT_CATALOG, EQUIPMENT_CATEGORIES, type EquipmentCategory } from '@/lib/equipmentCatalog'
 import { SPLIT_OPTIONS } from '@/lib/splitOptions'
@@ -289,6 +290,23 @@ export default function ProfilePage() {
         >
           {saved ? '✓ SAVED' : saving ? 'SAVING...' : 'SAVE CHANGES'}
         </button>
+
+        {/* Training Program */}
+        <div className="bg-surface-container border border-white/[0.06] rounded-2xl overflow-hidden">
+          <div className="px-md py-sm border-b border-white/[0.06]">
+            <p className="font-label-caps text-[11px] text-on-surface-variant/60 tracking-widest uppercase">Training Program</p>
+          </div>
+          <div className="px-md py-sm flex items-center justify-between">
+            <p className="font-body-md text-[14px] text-on-surface">Redesign your program</p>
+            <Link
+              href="/onboarding/goals?returnTo=/profile"
+              className="font-label-caps text-[11px] text-primary-container hover:brightness-110 tracking-wider uppercase flex items-center gap-[4px]"
+            >
+              <span className="material-symbols-outlined text-[14px]">edit</span>
+              Change Program
+            </Link>
+          </div>
+        </div>
 
         <button
           onClick={signOut}

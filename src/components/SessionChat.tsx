@@ -38,7 +38,7 @@ function extractExerciseNames(text: string, currentExercise?: string): string[] 
   const boldMatches = Array.from(text.matchAll(/\*\*(.*?)\*\*/g))
   for (const match of boldMatches) {
     const name = match[1].trim()
-    if (name.length > 2 && name.length < 40 && !name.includes('\n') && isNearSubVerb(match.index!)) {
+    if (name.length > 2 && name.length < 40 && !name.includes('\n') && isNearSubVerb(match.index ?? 0)) {
       if (!currentExercise || name.toLowerCase() !== currentExercise.toLowerCase()) {
         names.add(name)
       }
@@ -49,7 +49,7 @@ function extractExerciseNames(text: string, currentExercise?: string): string[] 
   const quoteMatches = Array.from(text.matchAll(/"(.*?)"/g))
   for (const match of quoteMatches) {
     const name = match[1].trim()
-    if (name.length > 2 && name.length < 40 && !name.includes('\n') && isNearSubVerb(match.index!)) {
+    if (name.length > 2 && name.length < 40 && !name.includes('\n') && isNearSubVerb(match.index ?? 0)) {
       if (!currentExercise || name.toLowerCase() !== currentExercise.toLowerCase()) {
         names.add(name)
       }
@@ -81,7 +81,7 @@ export function SessionChat({ workout, currentExercise, onClose, onAddExercise }
     setLoading(true)
 
     try {
-      const res = await fetch('/api/session-chat', {
+      const response = await fetch('/api/session-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -90,8 +90,27 @@ export function SessionChat({ workout, currentExercise, onClose, onAddExercise }
           userMessage: text,
         }),
       })
-      const data = await res.json()
-      setReply(data.reply)
+
+      if (!response.ok || !response.body) {
+        setReply("I'm having trouble connecting. Try a similar movement with the same equipment.")
+        return
+      }
+
+      // toTextStreamResponse emits plain text tokens — update reply incrementally
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let accumulated = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        accumulated += decoder.decode(value, { stream: true })
+        setReply(accumulated)
+      }
+
+      if (!accumulated) {
+        setReply("I'm having trouble connecting. Try a similar movement with the same equipment.")
+      }
     } catch {
       setReply("I'm having trouble connecting. Try a similar movement with the same equipment.")
     } finally {
@@ -102,14 +121,11 @@ export function SessionChat({ workout, currentExercise, onClose, onAddExercise }
   const suggestedNames = extractExerciseNames(reply, currentExercise)
 
   return (
-    /* Backdrop */
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-end z-50" onClick={onClose}>
-      {/* Bottom Sheet */}
       <div
         className="bg-surface-container-low border-t border-white/10 rounded-t-3xl w-full max-w-md mx-auto flex flex-col max-h-[85vh] shadow-[0_-8px_40px_rgba(0,0,0,0.8)]"
         onClick={e => e.stopPropagation()}
       >
-        {/* Header Section (Fixed) */}
         <div className="p-md pb-0 space-y-md">
           {/* Handle */}
           <div className="flex justify-center -mt-2 mb-xs">
@@ -133,7 +149,6 @@ export function SessionChat({ workout, currentExercise, onClose, onAddExercise }
           </div>
         </div>
 
-        {/* Scrollable Content Area */}
         <div className="flex-1 overflow-y-auto p-md space-y-md custom-scrollbar">
           {/* AI Reply */}
           {reply && (
@@ -188,7 +203,6 @@ export function SessionChat({ workout, currentExercise, onClose, onAddExercise }
           </div>
         </div>
 
-        {/* Footer Input Area (Fixed) */}
         <div className="p-md pt-0 pb-[max(1rem,env(safe-area-inset-bottom))]">
           <div className="flex gap-xs bg-surface-container-high rounded-xl p-xs border border-white/5">
             <input

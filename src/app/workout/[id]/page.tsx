@@ -237,6 +237,11 @@ export default function WorkoutSessionPage() {
                         {ex.type === 'strength' && ex.sets && ` · ${ex.sets}×${ex.reps ?? '?'}`}
                         {ex.type === 'cardio' && ex.duration_minutes && ` · ${ex.duration_minutes}min`}
                       </p>
+                      {ex.type === 'strength' && ex.sets && ex.weight_kg != null && ex.weight_kg > 0 && (
+                        <p className="font-label-caps text-[9px] text-primary-container/60 tracking-widest mt-[2px]">
+                          TARGET: {ex.weight_kg}KG
+                        </p>
+                      )}
                     </div>
                   </div>
 
