@@ -1,7 +1,12 @@
-import { anthropic } from '@ai-sdk/anthropic'
 import { createOpenAI } from '@ai-sdk/openai'
 
-export const agentModel = anthropic('claude-sonnet-4-6')
+const openai = createOpenAI({
+  apiKey: process.env.OPENAI_API_KEY ?? '',
+})
+
+export const agentModel = openai(
+  process.env.OPENAI_MODEL ?? 'gpt-4o'
+)
 
 const openrouter = createOpenAI({
   baseURL: 'https://openrouter.ai/api/v1',

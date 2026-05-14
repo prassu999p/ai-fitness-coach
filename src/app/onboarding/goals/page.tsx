@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, Suspense } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type { PrimaryGoal, PlanPreview } from '@/lib/types'
 import { PlanPreviewCard } from '@/components/PlanPreviewCard'
@@ -40,6 +40,9 @@ function GoalsContent() {
   const [revisionCount, setRevisionCount] = useState(0)
   const [revising, setRevising] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [draftId, setDraftId] = useState<string | null>(null)
+  const [pollActive, setPollActive] = useState(false)
+  const pendingOpRef = useRef<'generate' | 'revise'>('generate')
   const router = useRouter()
   const searchParams = useSearchParams()
   const rawReturnTo = searchParams.get('returnTo')
@@ -49,52 +52,80 @@ function GoalsContent() {
 
   const progressSegments = [step >= 1, step >= 2, step >= 3, step >= 4]
 
-  async function handlePreviewGenerate() {
-    setGenerating(true)
-    setError(null)
-    try {
-      const res = await fetch('/api/trainer/generate-program', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'generate', goal, durationWeeks }),
-      })
-      if (!res.ok) {
-        const body = await res.json() as { error?: string }
-        throw new Error(body.error ?? 'Unknown error')
-      }
-      const data = await res.json() as { preview: PlanPreview; draftProgram: object }
-      setPreview(data.preview)
-      setDraftProgram(data.draftProgram)
-      setStep(3)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Something went wrong. Please try again.')
-    } finally {
-      setGenerating(false)
-    }
-  }
+  useEffect(() => {
+    if (!pollActive || !draftId) return
 
-  async function handleRevise() {
-    setRevising(true)
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/trainer/generate-program?draftId=${draftId}`)
+        if (!res.ok) return
+        const data = await res.json() as {
+          status: string
+          preview: PlanPreview | null
+          draftProgram: object | null
+          errorMessage: string | null
+        }
+
+        if (data.status === 'ready' && data.preview && data.draftProgram) {
+          setPollActive(false)
+          setDraftId(null)
+          setPreview(data.preview)
+          setDraftProgram(data.draftProgram)
+          if (pendingOpRef.current === 'revise') {
+            setRevising(false)
+            setRevisionFeedback('')
+            setRevisionCount(c => c + 1)
+          } else {
+            setGenerating(false)
+            setStep(3)
+          }
+        } else if (data.status === 'error') {
+          setPollActive(false)
+          setDraftId(null)
+          setGenerating(false)
+          setRevising(false)
+          setError(data.errorMessage ?? 'Generation failed. Please try again.')
+        }
+      } catch {
+        // silently retry on network errors
+      }
+    }, 3000)
+
+    return () => clearInterval(interval)
+  }, [pollActive, draftId])
+
+  async function startGeneration(action: 'generate' | 'revise') {
     setError(null)
+    if (action === 'generate') {
+      setGenerating(true)
+    } else {
+      setRevising(true)
+    }
+
     try {
       const res = await fetch('/api/trainer/generate-program', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'revise', goal, durationWeeks, feedback: revisionFeedback, draftProgram }),
+        body: JSON.stringify({
+          action,
+          goal,
+          durationWeeks,
+          feedback: action === 'revise' ? revisionFeedback : undefined,
+          draftProgram: action === 'revise' ? draftProgram : undefined,
+        }),
       })
       if (!res.ok) {
         const body = await res.json() as { error?: string }
         throw new Error(body.error ?? 'Unknown error')
       }
-      const data = await res.json() as { preview: PlanPreview; draftProgram: object }
-      setPreview(data.preview)
-      setDraftProgram(data.draftProgram)
-      setRevisionFeedback('')
-      setRevisionCount(c => c + 1)
+      const data = await res.json() as { draftId: string; status: string }
+      pendingOpRef.current = action
+      setDraftId(data.draftId)
+      setPollActive(true)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Something went wrong. Please try again.')
-    } finally {
+      setGenerating(false)
       setRevising(false)
+      setError(e instanceof Error ? e.message : 'Something went wrong. Please try again.')
     }
   }
 
@@ -195,6 +226,7 @@ function GoalsContent() {
                 <button
                   key={d.weeks}
                   onClick={() => setDurationWeeks(d.weeks)}
+                  disabled={generating}
                   className={`w-full text-left rounded-xl p-sm border transition-all duration-200 flex items-center justify-between ${
                     durationWeeks === d.weeks
                       ? 'border-primary-container/40 bg-surface-container'
@@ -211,24 +243,37 @@ function GoalsContent() {
                 </button>
               ))}
             </div>
-            <div className="bg-surface-container-high border border-white/[0.06] rounded-xl p-sm">
-              <p className="font-body-md text-[13px] text-on-surface-variant">
-                <span className="text-primary-container font-semibold">Trainer note: </span>
-                {GOAL_DURATION_NOTES[goal]}
-              </p>
-            </div>
+            {!generating && (
+              <div className="bg-surface-container-high border border-white/[0.06] rounded-xl p-sm">
+                <p className="font-body-md text-[13px] text-on-surface-variant">
+                  <span className="text-primary-container font-semibold">Trainer note: </span>
+                  {GOAL_DURATION_NOTES[goal]}
+                </p>
+              </div>
+            )}
 
             {generating && (
-              <div className="flex flex-col items-center gap-md py-lg mt-lg">
+              <div className="flex flex-col items-center gap-md py-lg mt-lg flex-grow justify-center">
                 <div className="w-16 h-16 rounded-2xl bg-primary-container/10 border border-primary-container/20 flex items-center justify-center">
                   <span className="material-symbols-outlined text-primary-container text-[32px] animate-pulse" style={{ fontVariationSettings: "'FILL' 1" }}>psychology</span>
                 </div>
-                <p className="font-body-md text-[15px] text-on-surface-variant text-center">
-                  Your trainer is designing your program…
-                </p>
-                <p className="font-label-caps text-[11px] text-on-surface-variant/50 tracking-widest uppercase text-center">
-                  This takes about 15–20 seconds
-                </p>
+                <div className="text-center">
+                  <p className="font-body-md text-[15px] text-on-surface font-semibold">
+                    {"Your trainer is designing your program…"}
+                  </p>
+                  <p className="font-body-md text-[13px] text-on-surface-variant mt-xs">
+                    {"This takes 30–60 seconds. You can leave this screen — we'll let you know when it's ready."}
+                  </p>
+                </div>
+                <div className="flex gap-xs mt-xs">
+                  {[0, 1, 2].map(i => (
+                    <div
+                      key={i}
+                      className="w-2 h-2 rounded-full bg-primary-container/60 animate-bounce"
+                      style={{ animationDelay: `${i * 150}ms` }}
+                    />
+                  ))}
+                </div>
               </div>
             )}
 
@@ -270,7 +315,7 @@ function GoalsContent() {
             {revising && (
               <div className="flex items-center gap-sm mt-md py-sm">
                 <span className="material-symbols-outlined text-primary-container text-[20px] animate-pulse">psychology</span>
-                <p className="font-body-md text-[14px] text-on-surface-variant">Revising your program…</p>
+                <p className="font-body-md text-[14px] text-on-surface-variant">{"Revising your program…"}</p>
               </div>
             )}
 
@@ -288,9 +333,9 @@ function GoalsContent() {
               <span className="material-symbols-outlined text-primary-container text-[40px]" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
             </div>
             <div className="text-center">
-              <h2 className="font-headline-lg text-[28px] text-on-surface uppercase mb-xs">Your Program Is Ready!</h2>
+              <h2 className="font-headline-lg text-[28px] text-on-surface uppercase mb-xs">{"Your Program Is Ready!"}</h2>
               <p className="font-body-md text-[15px] text-on-surface-variant">
-                Your trainer has set up your {durationWeeks}-week {GOALS.find(g => g.value === goal)?.label.toLowerCase()} program.
+                {`Your trainer has set up your ${durationWeeks}-week ${GOALS.find(g => g.value === goal)?.label.toLowerCase()} program.`}
               </p>
             </div>
           </div>
@@ -320,7 +365,7 @@ function GoalsContent() {
 
           {step === 2 && (
             <button
-              onClick={handlePreviewGenerate}
+              onClick={() => startGeneration('generate')}
               disabled={generating}
               className="bg-primary-container text-on-primary-container font-label-caps text-[14px] py-sm px-lg rounded-xl uppercase tracking-wider hover:brightness-110 disabled:opacity-50 transition-all flex items-center gap-xs font-bold"
             >
@@ -333,7 +378,7 @@ function GoalsContent() {
             <div className="flex flex-col gap-xs w-full">
               {revisionCount < 3 && revisionFeedback.trim() && (
                 <button
-                  onClick={handleRevise}
+                  onClick={() => startGeneration('revise')}
                   disabled={revising || generating}
                   className="w-full bg-surface-container-high text-on-surface font-label-caps text-[13px] py-sm px-lg rounded-xl uppercase tracking-wider hover:brightness-110 disabled:opacity-50 transition-all border border-white/[0.08]"
                 >

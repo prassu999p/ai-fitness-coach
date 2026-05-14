@@ -96,7 +96,7 @@ export function SessionChat({ workout, currentExercise, onClose, onAddExercise }
         return
       }
 
-      // toTextStreamResponse emits plain text tokens — accumulate directly
+      // toTextStreamResponse emits plain text tokens — update reply incrementally
       const reader = response.body.getReader()
       const decoder = new TextDecoder()
       let accumulated = ''
@@ -105,9 +105,12 @@ export function SessionChat({ workout, currentExercise, onClose, onAddExercise }
         const { done, value } = await reader.read()
         if (done) break
         accumulated += decoder.decode(value, { stream: true })
+        setReply(accumulated)
       }
 
-      setReply(accumulated || "I'm having trouble connecting. Try a similar movement with the same equipment.")
+      if (!accumulated) {
+        setReply("I'm having trouble connecting. Try a similar movement with the same equipment.")
+      }
     } catch {
       setReply("I'm having trouble connecting. Try a similar movement with the same equipment.")
     } finally {

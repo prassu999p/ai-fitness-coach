@@ -22,49 +22,52 @@ export default function TrainerPage() {
 
   useEffect(() => {
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      setUserId(user.id)
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
 
-      // Mark all unread trainer messages as read
-      await supabase
-        .from('trainer_messages')
-        .update({ read_at: new Date().toISOString() })
-        .eq('user_id', user.id)
-        .is('read_at', null)
+        setUserId(user.id)
 
-      // Fetch messages
-      const { data: messages } = await supabase
-        .from('trainer_messages')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: true })
-        .limit(50)
-      setHistory(messages ?? [])
+        // Mark all unread trainer messages as read
+        await supabase
+          .from('trainer_messages')
+          .update({ read_at: new Date().toISOString() })
+          .eq('user_id', user.id)
+          .is('read_at', null)
 
-      // Fetch active program
-      const { data: activeProgram } = await supabase
-        .from('training_programs')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('status', 'active')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-      setProgram(activeProgram ?? null)
+        // Fetch messages — latest 50 in reverse-chron, then reverse for display
+        const { data: messages } = await supabase
+          .from('trainer_messages')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(50)
+        setHistory((messages ?? []).reverse())
 
-      // Fetch active/reviewing week
-      const { data: week } = await supabase
-        .from('program_weeks')
-        .select('status, updated_at')
-        .eq('user_id', user.id)
-        .in('status', ['active', 'reviewing'])
-        .order('week_start', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-      setActiveWeek(week ?? null)
+        // Fetch active program
+        const { data: activeProgram } = await supabase
+          .from('training_programs')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('status', 'active')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        setProgram(activeProgram ?? null)
 
-      setLoading(false)
+        // Fetch active/reviewing week
+        const { data: week } = await supabase
+          .from('program_weeks')
+          .select('status, updated_at')
+          .eq('user_id', user.id)
+          .in('status', ['active', 'reviewing'])
+          .order('week_start', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        setActiveWeek(week ?? null)
+      } finally {
+        setLoading(false)
+      }
     }
 
     load()
@@ -77,9 +80,9 @@ export default function TrainerPage() {
       .from('trainer_messages')
       .select('*')
       .eq('user_id', user.id)
-      .order('created_at', { ascending: true })
+      .order('created_at', { ascending: false })
       .limit(50)
-    setHistory(messages ?? [])
+    setHistory((messages ?? []).reverse())
   }
 
   async function sendMessage() {
@@ -140,6 +143,18 @@ export default function TrainerPage() {
 
       // Reload history from DB
       await reloadHistory()
+    } catch (err) {
+      console.error('[trainer/chat]', err)
+      setHistory(prev => [...prev, {
+        id: `error-${Date.now()}`,
+        user_id: '',
+        role: 'trainer',
+        content: 'Sorry, I ran into an error. Please try again.',
+        message_type: 'chat',
+        metadata: null,
+        read_at: null,
+        created_at: new Date().toISOString(),
+      }])
     } finally {
       setIsStreaming(false)
       setStreamContent('')
@@ -215,7 +230,7 @@ export default function TrainerPage() {
             : false
           return isStale ? (
             <div className="bg-surface-container-high rounded-xl p-sm flex items-center justify-between gap-sm">
-              <p className="text-sm text-on-surface-variant">Review didn't finish.</p>
+              <p className="text-sm text-on-surface-variant">{"Review didn't finish."}</p>
               <button
                 onClick={async () => {
                   await fetch('/api/trainer/review-week/reset', { method: 'PATCH' })

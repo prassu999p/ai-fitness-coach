@@ -10,7 +10,7 @@ export function createAgentTools(supabase: SupabaseClient, userId: string) {
     get_user_profile: tool({
       description: 'Get the authenticated user profile and their equipment list',
       inputSchema: z.object({}),
-      execute: async (_input: Record<string, never>) => {
+      execute: async ({}: Record<string, never>) => {
         const [{ data: profile }, { data: equipment }] = await Promise.all([
           supabase.from('profiles').select('*').eq('id', userId).single(),
           supabase.from('user_equipment').select('*').eq('user_id', userId),
@@ -74,7 +74,7 @@ export function createAgentTools(supabase: SupabaseClient, userId: string) {
     get_current_program: tool({
       description: 'Get the active training program and the current active program_weeks row',
       inputSchema: z.object({}),
-      execute: async (_input: Record<string, never>) => {
+      execute: async ({}: Record<string, never>) => {
         const { data: program } = await supabase
           .from('training_programs')
           .select('*')

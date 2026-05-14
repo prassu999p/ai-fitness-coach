@@ -5,6 +5,7 @@ import { agentModel } from '@/lib/agent/client'
 import { createAgentTools } from '@/lib/agent/tools'
 import { validateProgram } from '@/lib/agent/validateProgram'
 import { format } from 'date-fns'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 export const maxDuration = 60
 
@@ -29,6 +30,90 @@ Given the original program JSON and any user feedback, either commit it as-is or
 2. Call create_program with the final program
 3. Call add_trainer_message with type "check_in" and a warm welcome + week 1 summary`
 
+async function runGeneration(
+  supabase: SupabaseClient,
+  userId: string,
+  draftId: string,
+  params: {
+    goal: string
+    durationWeeks: number
+    action: 'generate' | 'revise'
+    feedback?: string
+    draftProgram?: object
+  }
+) {
+  const { goal, durationWeeks, action, feedback, draftProgram } = params
+  const tools = createAgentTools(supabase, userId)
+
+  try {
+    const { text } = await generateText({
+      model: agentModel,
+      system: PREVIEW_SYSTEM + `\nToday: ${format(new Date(), 'yyyy-MM-dd')}. Goal: ${goal}. Duration: ${durationWeeks} weeks.${feedback ? `\nUser feedback on previous draft: ${feedback}` : ''}`,
+      messages: [{
+        role: 'user',
+        content: (action === 'revise' && draftProgram)
+          ? `Revise this program:\n\`\`\`json\n${JSON.stringify(draftProgram)}\n\`\`\`\n\nFeedback: ${feedback ?? 'General revision'}`
+          : 'Generate my program now.',
+      }],
+      tools: { get_user_profile: tools.get_user_profile, get_workout_history: tools.get_workout_history },
+      stopWhen: stepCountIs(3),
+    })
+
+    let parsed: { preview: unknown; program: unknown }
+    try {
+      parsed = JSON.parse(text)
+    } catch {
+      throw new Error('Agent returned malformed JSON')
+    }
+
+    if (
+      !parsed || typeof parsed !== 'object' ||
+      !parsed.preview || typeof parsed.preview !== 'object' || Array.isArray(parsed.preview) ||
+      !parsed.program || typeof parsed.program !== 'object' || Array.isArray(parsed.program)
+    ) {
+      throw new Error('Agent returned invalid payload shape')
+    }
+
+    await supabase.from('program_drafts').update({
+      status: 'ready',
+      preview: parsed.preview,
+      draft_program: parsed.program,
+      updated_at: new Date().toISOString(),
+    }).eq('id', draftId)
+  } catch (error) {
+    await supabase.from('program_drafts').update({
+      status: 'error',
+      error_message: error instanceof Error ? error.message : 'Generation failed',
+      updated_at: new Date().toISOString(),
+    }).eq('id', draftId)
+  }
+}
+
+export async function GET(req: NextRequest) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const draftId = req.nextUrl.searchParams.get('draftId')
+  if (!draftId) return NextResponse.json({ error: 'draftId required' }, { status: 400 })
+
+  const { data, error } = await supabase
+    .from('program_drafts')
+    .select('status, preview, draft_program, error_message')
+    .eq('id', draftId)
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  if (error || !data) return NextResponse.json({ error: 'Draft not found' }, { status: 404 })
+
+  return NextResponse.json({
+    status: data.status,
+    preview: data.preview ?? null,
+    draftProgram: data.draft_program ?? null,
+    errorMessage: data.error_message ?? null,
+  })
+}
+
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -48,58 +133,37 @@ export async function POST(req: NextRequest) {
   }
 
   const action = body.action ?? 'generate'
-  const tools = createAgentTools(supabase, user.id)
-
   const goal = typeof body.goal === 'string' ? body.goal.slice(0, 100) : 'hypertrophy'
   const feedback = typeof body.feedback === 'string' ? body.feedback.slice(0, 1000) : undefined
   const durationWeeks = typeof body.durationWeeks === 'number' ? Math.min(Math.max(body.durationWeeks, 4), 16) : 8
 
   if (action === 'generate' || action === 'revise') {
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 30_000)
+    const { data: draft, error: insertError } = await supabase
+      .from('program_drafts')
+      .insert({ user_id: user.id, status: 'pending' })
+      .select('id')
+      .single()
 
-    try {
-      const { text } = await generateText({
-        model: agentModel,
-        system: PREVIEW_SYSTEM + `\nToday: ${format(new Date(), 'yyyy-MM-dd')}. Goal: ${goal}. Duration: ${durationWeeks} weeks.${feedback ? `\nUser feedback on previous draft: ${feedback}` : ''}`,
-        messages: [{ role: 'user', content: (action === 'revise' && body.draftProgram)
-          ? `Revise this program:\n\`\`\`json\n${JSON.stringify(body.draftProgram)}\n\`\`\`\n\nFeedback: ${feedback ?? 'General revision'}`
-          : 'Generate my program now.' }],
-        tools: { get_user_profile: tools.get_user_profile, get_workout_history: tools.get_workout_history },
-        stopWhen: stepCountIs(3),
-        abortSignal: controller.signal,
-      })
-      clearTimeout(timeout)
-
-      let parsed: { preview: unknown; program: unknown }
-      try {
-        parsed = JSON.parse(text)
-      } catch {
-        return NextResponse.json({ error: 'Agent returned malformed JSON' }, { status: 500 })
-      }
-      if (
-        !parsed || typeof parsed !== 'object' ||
-        !parsed.preview || typeof parsed.preview !== 'object' || Array.isArray(parsed.preview) ||
-        !parsed.program || typeof parsed.program !== 'object' || Array.isArray(parsed.program)
-      ) {
-        return NextResponse.json({ error: 'Agent returned invalid payload' }, { status: 500 })
-      }
-      return NextResponse.json({ preview: parsed.preview, draftProgram: parsed.program })
-    } catch (error) {
-      clearTimeout(timeout)
-      if (error instanceof Error && error.name === 'AbortError') {
-        return NextResponse.json({ error: 'Request timed out. Please try again.' }, { status: 504 })
-      }
-      console.error('[generate-program] generateText failed:', error)
-      return NextResponse.json({ error: 'Failed to generate program. Please try again.' }, { status: 500 })
+    if (insertError || !draft) {
+      return NextResponse.json({ error: 'Failed to create draft' }, { status: 500 })
     }
+
+    // Fire-and-forget: Node.js keeps running after response is sent.
+    // On Vercel, wrap with waitUntil() from @vercel/functions if added.
+    void runGeneration(supabase, user.id, draft.id, {
+      goal,
+      durationWeeks,
+      action,
+      feedback,
+      draftProgram: body.draftProgram,
+    })
+
+    return NextResponse.json({ draftId: draft.id, status: 'pending' })
   }
 
   // action === 'confirm'
   if (!body.draftProgram) return NextResponse.json({ error: 'draftProgram required' }, { status: 400 })
 
-  // Validate and normalise draftProgram before embedding in prompt
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let sanitizedDraft: object
   try {
     const validation = validateProgram(body.draftProgram as Parameters<typeof validateProgram>[0])
@@ -111,8 +175,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid draft program structure' }, { status: 400 })
   }
 
+  const tools = createAgentTools(supabase, user.id)
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 30_000)
+  const timeout = setTimeout(() => controller.abort(), 55_000)
 
   try {
     await generateText({
@@ -133,7 +198,7 @@ export async function POST(req: NextRequest) {
     if (error instanceof Error && error.name === 'AbortError') {
       return NextResponse.json({ error: 'Request timed out. Please try again.' }, { status: 504 })
     }
-    console.error('[generate-program] generateText failed:', error)
-    return NextResponse.json({ error: 'Failed to generate program. Please try again.' }, { status: 500 })
+    console.error('[generate-program] confirm failed:', error)
+    return NextResponse.json({ error: 'Failed to save program. Please try again.' }, { status: 500 })
   }
 }
