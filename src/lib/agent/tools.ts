@@ -161,7 +161,7 @@ export function createAgentTools(supabase: SupabaseClient, userId: string) {
           intensity: z.string(),
         })),
         week_plan: z.record(z.string(), z.record(z.string(), z.object({
-          focus: z.string(),
+          focus: z.string().describe('Daily focus, e.g. "Upper Body Strength"'),
           exercises: z.array(z.object({
             name: z.string(),
             sets: z.number().int(),
@@ -169,8 +169,8 @@ export function createAgentTools(supabase: SupabaseClient, userId: string) {
             weight_kg: z.number().optional(),
             tempo: z.string().optional(),
             rpe: z.number().optional(),
-          })).optional(),
-        }))),
+          })).optional().describe('List of exercises for this day'),
+        }))).describe('Map of week numbers ("1", "2", etc) to day plans (e.g. "Monday", "Tuesday")'),
       }),
       execute: async (input: {
         goal: 'hypertrophy' | 'strength' | 'fat_loss' | 'endurance' | 'general_fitness'

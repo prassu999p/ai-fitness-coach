@@ -42,7 +42,9 @@ IMPORTANT: The total volume for any single muscle group (chest, back, shoulders,
 const COMMIT_SYSTEM = `You are an expert strength coach. The user has approved (or given feedback on) a training program draft.
 Given the original program JSON and any user feedback, either commit it as-is or incorporate the feedback and commit.
 1. If feedback is provided, revise the program accordingly
-2. Call create_program with the final program
+2. Call create_program with the final program.
+The week_plan schema is: Record<weekNumberString, Record<dayNameString, { focus: string, exercises: { name, sets, reps, weight_kg?, tempo?, rpe? }[] }>>. 
+Example structure: { "1": { "Monday": { "focus": "...", "exercises": [...] } } }.
 3. Call add_trainer_message with type "check_in" and a warm welcome + week 1 summary`
 
 async function runGeneration(

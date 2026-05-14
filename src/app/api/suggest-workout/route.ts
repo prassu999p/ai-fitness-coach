@@ -65,7 +65,8 @@ export async function POST(req: NextRequest) {
     const weekNum = currentWeekNumber(program as TrainingProgram, parsedLocalDate)
     const weekSlots = (program.week_plan as Record<string, Record<string, { focus: string; exercises?: Array<{ name: string; sets: number; reps: number; weight_kg?: number }> }>>)[String(weekNum)]
 
-    const todaySlot = weekSlots?.[todayDayKey]
+    // week_plan keys may be full day names ("Thursday") or short keys ("thu") depending on how the program was created
+    const todaySlot = weekSlots?.[todayDayKey] ?? weekSlots?.[dayOfWeek]
     const focus = (todaySlot?.focus ?? 'rest') as DayFocus
 
     if (focus === 'rest' || !todaySlot) {
