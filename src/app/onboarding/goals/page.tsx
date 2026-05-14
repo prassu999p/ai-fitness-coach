@@ -19,12 +19,32 @@ const DURATIONS: Array<{ weeks: number; label: string; sublabel: string }> = [
   { weeks: 12, label: '3 Months', sublabel: '12 weeks' },
 ]
 
-const GOAL_DURATION_NOTES: Record<PrimaryGoal, string> = {
-  hypertrophy: '8–12 weeks allows full hypertrophy phases (accumulation → intensification → peak).',
-  strength: '12 weeks is optimal for strength peaking — allows a proper base and taper.',
-  fat_loss: '4–8 weeks keeps intensity high enough to preserve muscle during a deficit.',
-  endurance: '8–12 weeks builds aerobic base progressively without overtraining.',
-  general_fitness: '4–8 weeks works well — enough time to see real progress across all qualities.',
+const GOAL_DURATION_NOTES: Record<PrimaryGoal, Record<number, string>> = {
+  hypertrophy: {
+    4: '4 weeks is a "mini-cut" or intensity block. For real size, consider 8+ weeks.',
+    8: '8 weeks allows two solid hypertrophy phases (accumulation → intensification).',
+    12: '12 weeks is the gold standard for size — allows for a full periodized block.',
+  },
+  strength: {
+    4: '4 weeks works for a quick peaking block if you already have a strong base.',
+    8: '8 weeks allows for a solid base phase and a 2-week taper.',
+    12: '12 weeks is optimal for strength — allows for a proper GPP, base, and peak.',
+  },
+  fat_loss: {
+    4: '4 weeks is great for a quick "sprint" to lean out before a trip or event.',
+    8: '8 weeks is sustainable and allows for significant body composition changes.',
+    12: '12 weeks requires careful management to avoid metabolic adaptation.',
+  },
+  endurance: {
+    4: '4 weeks can improve your VO2 max but won\'t build a massive aerobic base.',
+    8: '8 weeks is enough to see significant improvements in cardiovascular capacity.',
+    12: '12 weeks builds a robust engine and improves muscular stamina deeply.',
+  },
+  general_fitness: {
+    4: '4 weeks is a great "kickstart" to get back into a routine.',
+    8: '8 weeks builds balanced strength and conditioning across all metrics.',
+    12: '12 weeks turns a routine into a lifestyle with deep fitness gains.',
+  },
 }
 
 type Step = 1 | 2 | 3 | 4
@@ -115,8 +135,8 @@ function GoalsContent() {
         }),
       })
       if (!res.ok) {
-        const body = await res.json() as { error?: string }
-        throw new Error(body.error ?? 'Unknown error')
+        const body = await res.json() as { error?: string; details?: string }
+        throw new Error(body.details ? `${body.error}: ${body.details}` : (body.error ?? 'Unknown error'))
       }
       const data = await res.json() as { draftId: string; status: string }
       pendingOpRef.current = action
@@ -139,8 +159,8 @@ function GoalsContent() {
         body: JSON.stringify({ action: 'confirm', draftProgram }),
       })
       if (!res.ok) {
-        const body = await res.json() as { error?: string }
-        throw new Error(body.error ?? 'Unknown error')
+        const body = await res.json() as { error?: string; details?: string }
+        throw new Error(body.details ? `${body.error}: ${body.details}` : (body.error ?? 'Unknown error'))
       }
       setStep(4)
     } catch (e) {
@@ -247,7 +267,7 @@ function GoalsContent() {
               <div className="bg-surface-container-high border border-white/[0.06] rounded-xl p-sm">
                 <p className="font-body-md text-[13px] text-on-surface-variant">
                   <span className="text-primary-container font-semibold">Trainer note: </span>
-                  {GOAL_DURATION_NOTES[goal]}
+                  {GOAL_DURATION_NOTES[goal][durationWeeks] ?? GOAL_DURATION_NOTES[goal][8]}
                 </p>
               </div>
             )}

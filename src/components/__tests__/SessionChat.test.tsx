@@ -12,16 +12,11 @@ const mockWorkout: SuggestedWorkout = {
 }
 
 /**
- * Build a mock fetch Response that simulates the Vercel AI SDK data-stream format.
- * Text chunks are encoded as lines: `0:"<json-string>"\n`
+ * Build a mock fetch Response that simulates a plain text stream.
  * We mock getReader() to return the full payload in a single read, then signal done.
  */
 function makeStreamResponse(reply: string): Partial<Response> {
-  // Encode the entire reply as a single data-stream line
-  const line = `0:${JSON.stringify(reply)}\n`
-
-  // Use Buffer (available in Node/Jest) to produce a Uint8Array-like value
-  const bytes = Buffer.from(line, 'utf8')
+  const bytes = Buffer.from(reply, 'utf8')
 
   let called = false
   const reader = {

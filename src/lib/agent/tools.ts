@@ -156,7 +156,7 @@ export function createAgentTools(supabase: SupabaseClient, userId: string) {
         start_date: z.string().describe('ISO date, e.g. 2026-05-12'),
         phases: z.array(z.object({
           name: z.string(),
-          week_range: z.tuple([z.number(), z.number()]),
+          week_range: z.array(z.number()),
           focus: z.string(),
           intensity: z.string(),
         })),
@@ -167,6 +167,8 @@ export function createAgentTools(supabase: SupabaseClient, userId: string) {
             sets: z.number().int(),
             reps: z.number().int(),
             weight_kg: z.number().optional(),
+            tempo: z.string().optional(),
+            rpe: z.number().optional(),
           })).optional(),
         }))),
       }),
@@ -174,8 +176,8 @@ export function createAgentTools(supabase: SupabaseClient, userId: string) {
         goal: 'hypertrophy' | 'strength' | 'fat_loss' | 'endurance' | 'general_fitness'
         duration_weeks: number
         start_date: string
-        phases: Array<{ name: string; week_range: [number, number]; focus: string; intensity: string }>
-        week_plan: Record<string, Record<string, { focus: string; exercises?: Array<{ name: string; sets: number; reps: number; weight_kg?: number }> }>>
+        phases: Array<{ name: string; week_range: number[]; focus: string; intensity: string }>
+        week_plan: Record<string, Record<string, { focus: string; exercises?: Array<{ name: string; sets: number; reps: number; weight_kg?: number; tempo?: string; rpe?: number }> }>>
       }) => {
         const { goal, duration_weeks, start_date, phases, week_plan } = input
         const validation = validateProgram({ goal, duration_weeks, start_date, phases, week_plan })

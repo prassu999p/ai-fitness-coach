@@ -15,14 +15,29 @@ const PREVIEW_SYSTEM = `You are an expert strength coach. The user wants a new t
 3. Return ONLY a JSON object (no markdown fences) in this exact shape:
 {
   "preview": {
-    "phases": [{ "name": string, "week_range": [n, n], "focus": string, "top_exercises": string[] }],
+    "phases": [{ "name": string, "week_range": [number, number], "focus": string, "top_exercises": string[] }],
     "duration_weeks": number,
     "sessions_per_week": number,
     "notes": string
   },
-  "program": { /* full ProgramInput ready for create_program */ }
+  "program": {
+    "goal": "hypertrophy" | "strength" | "fat_loss" | "endurance" | "general_fitness",
+    "duration_weeks": number,
+    "start_date": "YYYY-MM-DD",
+    "phases": [{ "name": string, "week_range": [number, number], "focus": string, "intensity": string }],
+    "week_plan": {
+      "1": { // week number as string key
+        "Monday": { "focus": string, "exercises": [{ "name": string, "sets": number, "reps": number }] },
+        "Tuesday": { "focus": string, "exercises": [...] },
+        ... // all training days
+      },
+      "2": { ... },
+      ... // up to duration_weeks
+    }
+  }
 }
-Do not call create_program yet. The user will review the preview first.`
+Do not call create_program yet. The user will review the preview first.
+IMPORTANT: The total volume for any single muscle group (chest, back, shoulders, quads, hamstrings, arms, core) MUST NOT exceed 30 sets per week.`
 
 const COMMIT_SYSTEM = `You are an expert strength coach. The user has approved (or given feedback on) a training program draft.
 Given the original program JSON and any user feedback, either commit it as-is or incorporate the feedback and commit.
@@ -198,7 +213,13 @@ export async function POST(req: NextRequest) {
     if (error instanceof Error && error.name === 'AbortError') {
       return NextResponse.json({ error: 'Request timed out. Please try again.' }, { status: 504 })
     }
-    console.error('[generate-program] confirm failed:', error)
-    return NextResponse.json({ error: 'Failed to save program. Please try again.' }, { status: 500 })
+    console.error('[generate-program] confirm failed. Full error:', error)
+    if (error instanceof Error) {
+      console.error('Stack trace:', error.stack)
+    }
+    return NextResponse.json({ 
+      error: 'Failed to save program. Please try again.',
+      details: error instanceof Error ? error.message : String(error)
+    }, { status: 500 })
   }
 }
